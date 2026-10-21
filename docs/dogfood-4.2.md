@@ -330,3 +330,26 @@ The hook now also sends a ~300-token code map on the first prompt of each sessio
 - n=1. Earlier runs showed ±$0.15 per task between runs with nothing changed. All four tasks landing below both control runs is a consistent signal, not proof.
 - Next: 2–3 more replicates of mem-5, plus one control replicate run at the same time to rule out drift over time.
 - Then a longer sequence with more repeats.
+
+### R3-map replicates: 3 code-map runs vs 3 control runs
+`mem-6` and `mem-7` repeat the mem-5 setup. `ctrl-3` is a fresh control run, interleaved with them task by task, to catch drift over time. The usage limit stopped the batch once, at `mem-7` T2. That aborted run made no file changes and is kept as `aborted-mem-7-T2.*`; the session was re-run. All 12 new sessions passed the full suite and the acceptance tests (24/24 for R3 so far).
+
+| Task | Code map: mean (mem-5, mem-6, mem-7) | Control: mean (ctrl-1, ctrl-2, ctrl-3) | Δ |
+|---|---|---|---|
+| T1 (empty memory) | $0.51 (0.45, 0.56, 0.53) | $0.57 (0.60, 0.46, 0.64) | −9% |
+| T2 (same kind) | $0.42 (0.37, 0.39, 0.48) | $0.50 (0.46, 0.48, 0.55) | −17% |
+| T3 (after the rename) | $0.43 (0.38, 0.43, 0.48) | $0.46 (0.39, 0.48, 0.50) | −6% |
+| T4 (new kind of change) | $0.38 (0.34, 0.43, 0.37) | $0.46 (0.40, 0.35, 0.61) | −16% |
+| **Sequence total** | **$1.74** (1.54, 1.82, 1.86) | **$1.98** (1.86, 1.77, 2.30) | **−12%** |
+
+- **Cost: about 12% cheaper per sequence**, with 11 of 12 task runs below the control mean. Against the concurrent control (`ctrl-3`, $2.30) the two runs from the same window were 19–21% cheaper. Turns per sequence are about the same: 82–96 vs 81–107.
+- **Reading drops much more than cost.**
+  - T1 chars read before the first edit: 14k with the map vs 35k for control (about −60%).
+  - T4: 21k vs 23k; the map's top file was right, but the task is small.
+- Cost falls less than reading, because output and the fixed ~20k context are untouched (see 4.5 in PLAN.md).
+- **Not significant yet.** The totals overlap: ctrl-2 at $1.77 beats two map runs. With n=3 per arm this is a consistent direction, not a proven effect.
+- **Honest claim so far:** on a mid-size repo and a short 4-task sequence, the code map plus verified memory cut the reading before the first edit by more than half, and total cost by roughly 10–15%, with no loss of success.
+- **Next:**
+  - a longer sequence (more same-kind repeats, where the memory part should add up);
+  - a second repo;
+  - consider sending the map without waiting for recall hits.
