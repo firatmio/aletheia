@@ -278,3 +278,29 @@ Reading (n=1, suggestive only):
 - A map memory pays off when the **next task is the same kind of change** (−40% on T2). It does nothing for a new kind of change.
 - Over the whole sequence it broke even with control, where the old snippet was +9%. Excluding T4, T1–T3 cost $1.18 vs $1.43 for control (about −17%).
 - The value grows with how often the same kind of change repeats, which is common in real projects (new endpoint, new builtin, new migration). Next: a longer sequence with repeated change types and ≥2 replicates, before any README number.
+
+### R3-hook: automatic recall hook + `symbol:` anchors + live pointers (1 replicate, `mem-4`)
+Branch `feat/hook-and-pointers`:
+- `aletheia hook` runs as Claude Code's `UserPromptSubmit` hook;
+- the snippet suggests `symbol:` anchors for map memories;
+- recall shows `(file:lines)` pointers.
+
+| Task | mem-4 (hook) | mem-3 (map rule) | ctrl (mean of 2) |
+|---|---|---|---|
+| T1 (empty memory) | $0.66 | $0.53 | $0.53 |
+| T2 (same kind, map available) | $0.38 | $0.28 | $0.47 |
+| T3 (after the rename trap) | $0.36 | $0.37 | $0.43 |
+| T4 (new kind of change) | $0.43 | $0.65 | $0.38 |
+| Total | $1.83 | $1.83 | $1.82 |
+
+- **The hook fired in T2–T4.** Its per-session state files exist, and the agents never called recall themselves. In T1 it stayed silent because the store was empty. It cannot be seen in the `stream-json` log, so the state files are the evidence.
+- **The repeat tasks (T2, T3) were again cheaper than control:** −19% and −16% here, −40% and −14% in mem-3. Read before first edit was 15k/20k chars vs 30k/29k for control. T1 and T4 swing by ±$0.15 between runs with no memory involved (agent variance), and the totals stay at break-even.
+- **Windowed reads are not new.** Control agents already read with offset/limit (47 of 58 reads). The gain comes from knowing *where* to read, not from reading in windows.
+- **A real false `[ok]` on a map memory.** The T1 map said "register in `builtin/builtin.go`", but its anchors were `symbol:` on `validation.go`, `lib.go` and `builtin_test.go` plus `exists:` on the docs. After the rename it stayed `[ok]` and the hook injected it into T3. The agent found `registry.go` by itself and superseded the map, so no harm was done. But it is exactly the failure Aletheia promises to prevent: **a path named in a claim was not anchored.**
+  → Fix: when a claim names a file that exists, add an `exists:` anchor for it automatically (or at least warn).
+
+**Reading after four memory runs (n=1 each):**
+- Same-kind repeats are consistently 15–40% cheaper.
+- The first task of each kind pays for writing the memories.
+- Over a 4-task sequence with one repeat (T2) plus one trap repeat (T3), that nets out to break-even.
+- The saving should grow with the number of repeats per kind. The next benchmark needs sequences with ≥3 tasks of the same kind, and ≥2 replicates.
