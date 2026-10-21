@@ -177,8 +177,10 @@ func toolDefs() []map[string]any {
 		},
 		{
 			"name": "remember",
-			"description": "Save one durable fact with evidence. anchors: file:go.mod (content hash), " +
-				"contains:go.mod::go 1\\.23 (regex), exists:src/auth. Anchors must hold now. " +
+			"description": "Save one durable fact (one per call) with evidence. anchors: contains:go.mod::go 1\\.23 " +
+				"(regex on the line that proves the claim, not a comment or name), exists:src/auth, " +
+				"file:go.mod (content hash; any edit stales it, avoid on busy files). Anchors must hold now. " +
+				"Absence claims (\"no auth\"): no anchors, ttl 30d. " +
 				"supersedes: ids of outdated memories to replace. Never store secrets.",
 			"inputSchema": obj(map[string]any{
 				"claim": str, "anchors": strs, "body": str, "tags": strs, "ttl": str,

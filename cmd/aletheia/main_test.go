@@ -28,16 +28,21 @@ func TestEndToEnd(t *testing.T) {
 	writeFile(t, dir, "go.mod", "module x\n\ngo 1.23\n")
 
 	code, out, _ := runCLI(t, dir, "", "init", "--agents")
-	if code != 0 || !strings.Contains(out, "initialized") || !strings.Contains(out, "AGENTS.md") {
+	if code != 0 || !strings.Contains(out, "initialized") || !strings.Contains(out, "AGENTS.md") ||
+		!strings.Contains(out, "CLAUDE.md") {
 		t.Fatalf("init: %d %q", code, out)
 	}
 	agents, _ := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
 	if !strings.Contains(string(agents), "<!-- aletheia:begin -->") {
 		t.Fatalf("AGENTS.md missing snippet: %q", agents)
 	}
+	claude, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
+	if string(claude) != string(agents) {
+		t.Fatalf("CLAUDE.md should get the same snippet: %q", claude)
+	}
 	code, out, _ = runCLI(t, dir, "", "init", "--agents")
 	again, _ := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
-	if code != 0 || !strings.Contains(out, "already") || string(again) != string(agents) {
+	if code != 0 || strings.Count(out, "already contains") != 2 || string(again) != string(agents) {
 		t.Fatalf("init must be idempotent: %q", out)
 	}
 
@@ -158,5 +163,18 @@ func TestMissingStore(t *testing.T) {
 	code, _, errs := runCLI(t, t.TempDir(), "", "recall", "anything")
 	if code != exitFail || !strings.Contains(errs, "aletheia init") {
 		t.Fatalf("want a helpful error, got %d %q", code, errs)
+	}
+}
+
+func TestInitAgentsKeepsExistingClaudeMD(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "CLAUDE.md", "# Project rules\n\nUse tabs.")
+	if code, out, _ := runCLI(t, dir, "", "init", "--agents"); code != 0 {
+		t.Fatalf("init: %d %q", code, out)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
+	got := string(data)
+	if !strings.HasPrefix(got, "# Project rules\n\nUse tabs.\n\n<!-- aletheia:begin -->") {
+		t.Fatalf("snippet must be appended after the existing rules: %q", got)
 	}
 }

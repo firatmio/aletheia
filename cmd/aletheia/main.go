@@ -251,15 +251,31 @@ func (c *cli) init(args []string) int {
 	return exitOK
 }
 
+// agentFiles are the instruction files agents load on their own: Claude Code
+// reads CLAUDE.md and ignores AGENTS.md; Codex, Cursor and others read
+// AGENTS.md.
+var agentFiles = []string{"CLAUDE.md", "AGENTS.md"}
+
 func installAgents(root string) (string, error) {
-	path := filepath.Join(root, "AGENTS.md")
+	var msgs []string
+	for _, name := range agentFiles {
+		msg, err := installSnippet(filepath.Join(root, name), name)
+		if err != nil {
+			return "", err
+		}
+		msgs = append(msgs, msg)
+	}
+	return strings.Join(msgs, "\n"), nil
+}
+
+func installSnippet(path, name string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
 		return "", err
 	}
 	content := string(data)
 	if strings.Contains(content, "<!-- aletheia:begin -->") {
-		return "AGENTS.md already contains Aletheia instructions", nil
+		return name + " already contains Aletheia instructions", nil
 	}
 	if content != "" {
 		if !strings.HasSuffix(content, "\n") {
@@ -271,7 +287,7 @@ func installAgents(root string) (string, error) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return "", err
 	}
-	return "added Aletheia instructions to AGENTS.md", nil
+	return "added Aletheia instructions to " + name, nil
 }
 
 func (c *cli) remember(args []string) int {

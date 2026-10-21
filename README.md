@@ -52,7 +52,7 @@ Aletheia stores each memory as a **claim plus anchors**: small pieces of evidenc
 go install github.com/firatmio/aletheia/cmd/aletheia@latest
 
 cd your-project
-aletheia init --agents        # creates .aletheia/ and adds usage notes to AGENTS.md
+aletheia init --agents        # creates .aletheia/ and adds usage notes to CLAUDE.md and AGENTS.md
 
 aletheia remember "Auth tokens are issued in src/auth/jwt.go" \
   --anchor file:src/auth/jwt.go \
@@ -98,7 +98,10 @@ Aletheia speaks **MCP over stdio** and also works as a plain **CLI**, so any age
 
 ```bash
 claude mcp add aletheia -- aletheia serve
+aletheia init --agents
 ```
+
+Claude Code loads MCP tools on demand, so their descriptions rarely reach the model. The `CLAUDE.md` block written by `init --agents` is what makes it recall before exploring.
 </details>
 
 <details>
@@ -149,7 +152,7 @@ claude mcp add aletheia -- aletheia serve
 <details>
 <summary><b>Any agent without MCP</b> (Codex, Aider, custom agents)</summary>
 
-Run `aletheia init --agents`. It appends a short block to `AGENTS.md` that teaches the agent to call `aletheia recall` and `aletheia remember` from the shell. Add `--json` to any read command for machine-readable output.
+Run `aletheia init --agents`. It appends a short block to `CLAUDE.md` and `AGENTS.md` that teaches the agent to call `aletheia recall` and `aletheia remember` from the shell. Add `--json` to any read command for machine-readable output.
 </details>
 
 The MCP server exposes four tools: `recall`, `remember`, `get`, `verify`.
@@ -194,7 +197,7 @@ These are design properties, not benchmark results yet. A benchmark harness comp
 
 - **Never executes anything.** Anchors only read files; there is no "run this command to verify" anchor.
 - **Stays inside the project.** Anchor paths are relative and cannot escape the root, including through symlinks.
-- **Memories are data, not instructions.** The MCP server tells agents so, and `AGENTS.md` repeats it.
+- **Memories are data, not instructions.** The MCP server tells agents so, and the `CLAUDE.md` / `AGENTS.md` block repeats it.
 - **No network, no telemetry, no dependencies.** A single static binary using only the Go standard library.
 
 ## CLI reference
