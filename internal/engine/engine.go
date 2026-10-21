@@ -22,6 +22,10 @@ const (
 	MaxBodyBytes        = 8000
 	DefaultConfidence   = 0.8
 	SimilarityThreshold = 0.6
+
+	// UnanchoredTTL is the expiry given to memories without anchors when no
+	// ttl is set: nothing else can ever mark them stale.
+	UnanchoredTTL = 90 * 24 * time.Hour
 )
 
 // Freshness says how far a memory can be trusted right now.
@@ -38,6 +42,7 @@ const (
 type Verdict struct {
 	Freshness Freshness `json:"freshness"`
 	Reasons   []string  `json:"reasons,omitempty"`
+	Notes     []string  `json:"notes,omitempty"` // advice from Remember; Judge never sets it
 }
 
 // Engine runs memory operations against one store.
@@ -195,13 +200,22 @@ func (e *Engine) Remember(in RememberInput) (*store.Memory, Verdict, error) {
 		source = source[:64]
 	}
 
-	var anchors []string
+	var anchors, notes []string
 	for _, spec := range in.Anchors {
 		a, err := anchor.Make(e.Store.Root, spec)
 		if err != nil {
 			return nil, Verdict{}, fmt.Errorf("anchor %q: %w", spec, err)
 		}
+		if anchor.CommentOnly(e.Store.Root, a) {
+			notes = append(notes, a.String()+" only matches comments, which can stay while the code changes; anchor the code itself")
+		}
 		anchors = append(anchors, a.String())
+	}
+	ttl := in.TTL
+	if ttl == 0 && len(anchors) == 0 {
+		ttl = UnanchoredTTL
+		notes = append(notes, fmt.Sprintf("no anchors: expires in %dd unless re-confirmed with verify --reseal",
+			int(UnanchoredTTL.Hours()/24)))
 	}
 
 	var old []*store.Memory
@@ -235,8 +249,8 @@ func (e *Engine) Remember(in RememberInput) (*store.Memory, Verdict, error) {
 		ID: id, Claim: claim, Body: strings.TrimSpace(in.Body), Tags: tags, Anchors: anchors,
 		Confidence: conf, Status: store.StatusActive, Source: source, Created: now, Updated: now,
 	}
-	if in.TTL > 0 {
-		exp := now.Add(in.TTL)
+	if ttl > 0 {
+		exp := now.Add(ttl)
 		m.Expires = &exp
 	}
 	for _, o := range old {
@@ -253,7 +267,9 @@ func (e *Engine) Remember(in RememberInput) (*store.Memory, Verdict, error) {
 			return nil, Verdict{}, fmt.Errorf("saved %s but could not supersede %s: %w", m.ID, o.ID, err)
 		}
 	}
-	return m, e.Judge(m), nil
+	v := e.Judge(m)
+	v.Notes = notes
+	return m, v, nil
 }
 
 // AnchorStatus is one anchor and whether it currently holds.
@@ -327,7 +343,8 @@ func (e *Engine) Verify(ref string) (*VerifyItem, error) {
 // Reseal records that a stale memory was re-checked and still holds: file
 // hashes are refreshed. Pattern and existence anchors must already hold, so
 // a claim that is actually wrong cannot be resealed; supersede it instead.
-// A positive ttl sets a new expiry.
+// A positive ttl sets a new expiry; unanchored memories get UnanchoredTTL
+// when ttl is zero.
 func (e *Engine) Reseal(ref string, ttl time.Duration) (*VerifyItem, error) {
 	m, err := e.Store.Get(ref)
 	if err != nil {
@@ -350,6 +367,9 @@ func (e *Engine) Reseal(ref string, ttl time.Duration) (*VerifyItem, error) {
 	}
 	m.Anchors = sealed
 	now := e.now()
+	if ttl == 0 && len(m.Anchors) == 0 {
+		ttl = UnanchoredTTL // re-confirming an unanchored memory buys it another period
+	}
 	if ttl > 0 {
 		exp := now.Add(ttl)
 		m.Expires = &exp

@@ -68,6 +68,87 @@ func TestContainsAnchor(t *testing.T) {
 	}
 }
 
+func TestContainsSurvivesRealignment(t *testing.T) {
+	root := project(t)
+	write(t, root, "limits.go", "const (\n\tDefaultBudget = 600\n\tDefaultLimit  = 8\n)\n")
+	a, err := Make(root, "contains:limits.go::DefaultLimit  = 8")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// gofmt realigns the block after a longer name is added.
+	write(t, root, "limits.go", "const (\n\tDefaultBudget       = 600\n\tDefaultLimit        = 8\n\tDefaultSessionLimit = 1000\n)\n")
+	if r := Check(root, a); !r.OK {
+		t.Fatalf("realignment must not stale the anchor: %s", r.Detail)
+	}
+	write(t, root, "limits.go", "const (\n\tDefaultLimit\t= 8\n)\n")
+	if r := Check(root, a); !r.OK {
+		t.Fatalf("tabs count as spaces: %s", r.Detail)
+	}
+	write(t, root, "limits.go", "const (\n\tDefaultLimit = 9\n)\n")
+	if r := Check(root, a); r.OK {
+		t.Fatal("a changed value must still stale the anchor")
+	}
+	write(t, root, "limits.go", "const (\n\tDefaultLimit=8\n)\n")
+	if r := Check(root, a); r.OK {
+		t.Fatal("spaces in the pattern still require at least one space")
+	}
+}
+
+func TestRelaxSpacesKeepsRegexMeaning(t *testing.T) {
+	for in, want := range map[string]string{
+		"a  = 1":    `a[ \t]+=[ \t]+1`,
+		"a +b":      "a +b",   // quantified space
+		"a {2}b":    "a {2}b", // quantified space
+		"x [ ]y":    `x[ \t]+[ ]y`,
+		`a\ b`:      `a\ b`,
+		"[^ ] z":    `[^ ][ \t]+z`,
+		"[] ]{1} a": `[] ]{1}[ \t]+a`,
+		"if x {":    `if[ \t]+x[ \t]+{`,
+	} {
+		if got := relaxSpaces(in); got != want {
+			t.Errorf("relaxSpaces(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestCommentOnly(t *testing.T) {
+	root := project(t)
+	write(t, root, "lethe.go", `// Package x. It never executes anything.
+package x
+
+type Options struct {
+	Days int // archive after this many days (default 30)
+}
+
+/*
+ * Retries: three by default.
+ */
+func defaults(o *Options) { o.Days = 30 }
+
+var url = "http://example.com" // the "//" inside the string is not a comment
+`)
+	write(t, root, "notes.md", "# Never executes\n")
+	for spec, want := range map[string]bool{
+		"contains:lethe.go::never executes":    true,  // doc comment
+		`contains:lethe.go::\(default 30\)`:    true,  // trailing comment
+		"contains:lethe.go::Retries: three":    true,  // block comment
+		`contains:lethe.go::o\.Days = 30`:      false, // code
+		"contains:lethe.go::Days":              false, // matches code and comment
+		"contains:lethe.go::example\\.com":     false, // string, not comment
+		"contains:lethe.go::the \"//\" inside": true,
+		"contains:notes.md::Never executes":    false, // unknown language
+		"exists:lethe.go":                      false,
+	} {
+		a, err := Make(root, spec)
+		if err != nil {
+			t.Fatalf("%s: %v", spec, err)
+		}
+		if got := CommentOnly(root, a); got != want {
+			t.Errorf("CommentOnly(%s) = %v, want %v", spec, got, want)
+		}
+	}
+}
+
 func TestExistsAnchor(t *testing.T) {
 	root := project(t)
 	a, err := Make(root, "exists:src/auth")

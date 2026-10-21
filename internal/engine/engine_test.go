@@ -213,6 +213,60 @@ func TestExpiry(t *testing.T) {
 	}
 }
 
+func TestUnanchoredMemoryExpiresByDefault(t *testing.T) {
+	v := newEnv(t)
+	m, verdict, err := v.e.Remember(RememberInput{Claim: "The API has no authentication"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Expires == nil || !m.Expires.Equal(v.now.Add(UnanchoredTTL)) {
+		t.Fatalf("unanchored memory should expire after %v, got %v", UnanchoredTTL, m.Expires)
+	}
+	if len(verdict.Notes) != 1 || !strings.Contains(verdict.Notes[0], "expires in 90d") {
+		t.Fatalf("the agent should be told it expires: %q", verdict.Notes)
+	}
+	if s := RenderSaved(m, verdict); !strings.Contains(s, "\nnote: no anchors") {
+		t.Fatalf("note missing from output: %q", s)
+	}
+
+	v.advance(UnanchoredTTL + time.Hour)
+	if got, _ := v.e.Verify(m.ID); got.Freshness != Stale {
+		t.Fatalf("want expired, got %+v", got)
+	}
+	if got, err := v.e.Reseal(m.ID, 0); err != nil || got.Freshness != Unverifiable {
+		t.Fatalf("reseal without ttl should renew an unanchored memory: %v %+v", err, got)
+	}
+
+	explicit := v.remember(t, RememberInput{Claim: "Staging is frozen until Friday", TTL: 72 * time.Hour})
+	if !explicit.Expires.Equal(v.now.Add(72 * time.Hour)) {
+		t.Fatalf("an explicit ttl wins: %v", explicit.Expires)
+	}
+	anchored := v.remember(t, RememberInput{Claim: "Go version lives in go.mod", Anchors: []string{"exists:go.mod"}})
+	if anchored.Expires != nil {
+		t.Fatalf("anchored memories do not expire by default: %v", anchored.Expires)
+	}
+}
+
+func TestRememberWarnsAboutCommentOnlyAnchors(t *testing.T) {
+	v := newEnv(t)
+	v.write(t, "lethe.go", "package x\n\ntype Options struct {\n\tDays int // default 30\n}\n\nfunc defaults(o *Options) { o.Days = 30 }\n")
+	_, verdict, err := v.e.Remember(RememberInput{
+		Claim: "lethe archives after 30 days by default", Anchors: []string{"contains:lethe.go::default 30"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if verdict.Freshness != Verified || len(verdict.Notes) != 1 || !strings.Contains(verdict.Notes[0], "only matches comments") {
+		t.Fatalf("want a saved memory with a warning, got %+v", verdict)
+	}
+	_, verdict, err = v.e.Remember(RememberInput{
+		Claim: "Default archive age is set in defaults()", Anchors: []string{`contains:lethe.go::o\.Days = 30`},
+	})
+	if err != nil || len(verdict.Notes) != 0 {
+		t.Fatalf("a code anchor needs no warning: %v %+v", err, verdict)
+	}
+}
+
 func TestUnanchoredRanksBelowVerified(t *testing.T) {
 	v := newEnv(t)
 	v.remember(t, RememberInput{Claim: "Linting runs in CI hint", Force: true})

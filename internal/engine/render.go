@@ -70,6 +70,9 @@ func RenderSaved(m *store.Memory, v Verdict) string {
 	if len(m.Supersedes) > 0 {
 		s += "\nsuperseded: " + strings.Join(m.Supersedes, ", ")
 	}
+	for _, n := range v.Notes {
+		s += "\nnote: " + n
+	}
 	return s
 }
 

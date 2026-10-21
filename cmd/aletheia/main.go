@@ -51,7 +51,9 @@ Usage:
 Anchors (evidence a memory is checked against, relative to the project root):
   file:PATH                content hash of the file (sealed when saved)
   contains:PATH::REGEX     the file still matches the regular expression
+                           (spaces in REGEX match any run of spaces/tabs)
   exists:PATH              the path still exists
+Memories without anchors expire after 90d unless --ttl is given.
 
 Run inside a project, or point at one with --dir or ALETHEIA_DIR.
 Exit codes: 0 ok, 1 error or stale memories (verify), 2 usage, 3 conflicting memory.

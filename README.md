@@ -166,8 +166,10 @@ The MCP server exposes four tools: `recall`, `remember`, `get`, `verify`.
 | `exists:PATH` | the path still exists | `exists:src/auth` |
 
 - Use `contains` for claims about *one thing* in a file, and `file` when any change should trigger a re-check.
+- In a `contains` pattern, a run of spaces or tabs matches any run of spaces or tabs, so reformatting (gofmt, prettier) does not stale it.
+- Anchor the code that does the thing, not a comment about it. `remember` warns when a `contains` anchor only matches comments, since a comment can stay while the code changes.
 - Add `--ttl 30d` for facts that age on their own ("staging is being migrated this week").
-- A memory with no anchors is allowed. It comes back as `[?]`, a hint ranked below verified facts.
+- A memory with no anchors is allowed. It comes back as `[?]`, a hint ranked below verified facts. Nothing can mark it stale, so it expires after 90 days unless you set `--ttl` or re-confirm it with `verify --reseal`.
 
 When a memory goes stale, the agent re-checks the claim and then either:
 

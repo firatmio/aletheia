@@ -4,6 +4,7 @@
 //
 //	file:go.mod@<sha256>        the file's content hash is unchanged
 //	contains:go.mod::go 1\.23   the file still matches this regular expression
+//	                            (runs of spaces/tabs match any run of spaces/tabs)
 //	exists:src/auth             the path still exists
 //
 // Verification only reads files inside the project root. It never executes
@@ -217,6 +218,69 @@ func readHead(full string) ([]byte, error) {
 	return normalizeText(data), nil
 }
 
+// compileContains compiles a contains pattern in multi-line mode, with
+// runs of spaces and tabs relaxed (see relaxSpaces).
+func compileContains(pattern string) (*regexp.Regexp, error) {
+	return regexp.Compile("(?m)" + relaxSpaces(pattern))
+}
+
+// relaxSpaces lets every run of literal spaces and tabs in a pattern match
+// any run of spaces and tabs, so realigning code (gofmt, prettier) does not
+// stale an anchor. Runs that are escaped, inside a character class, or
+// followed by a quantifier keep their meaning.
+func relaxSpaces(pattern string) string {
+	var b strings.Builder
+	inClass := false
+	for i := 0; i < len(pattern); i++ {
+		c := pattern[i]
+		switch {
+		case c == '\\' && i+1 < len(pattern):
+			b.WriteString(pattern[i : i+2])
+			i++
+		case inClass:
+			if c == ']' {
+				inClass = false
+			}
+			b.WriteByte(c)
+		case c == '[':
+			inClass = true
+			b.WriteByte(c)
+			if i+1 < len(pattern) && pattern[i+1] == '^' {
+				b.WriteByte('^')
+				i++
+			}
+			if i+1 < len(pattern) && pattern[i+1] == ']' { // a leading ] is literal
+				b.WriteByte(']')
+				i++
+			}
+		case c == ' ' || c == '\t':
+			j := i
+			for j < len(pattern) && (pattern[j] == ' ' || pattern[j] == '\t') {
+				j++
+			}
+			if j < len(pattern) && isQuantifier(pattern[j:]) {
+				b.WriteString(pattern[i:j])
+			} else {
+				b.WriteString(`[ \t]+`)
+			}
+			i = j - 1
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
+
+func isQuantifier(s string) bool {
+	switch s[0] {
+	case '*', '+', '?':
+		return true
+	case '{':
+		return len(s) > 1 && s[1] >= '0' && s[1] <= '9'
+	}
+	return false
+}
+
 // Check verifies one anchor against the files under root.
 func Check(root string, a Anchor) Result {
 	full, err := resolve(root, a.Path)
@@ -246,7 +310,7 @@ func Check(root string, a Anchor) Result {
 		if err != nil {
 			return Result{Detail: a.Path + ": " + err.Error()}
 		}
-		re, err := regexp.Compile("(?m)" + a.Arg)
+		re, err := compileContains(a.Arg)
 		if err != nil {
 			return Result{Detail: a.Path + ": bad regex"}
 		}
