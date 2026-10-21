@@ -228,3 +228,28 @@ func TestHookStaysQuietWithoutStoreOrInput(t *testing.T) {
 		}
 	}
 }
+
+func TestHookAddsCodeMapOncePerSession(t *testing.T) {
+	t.Setenv("ALETHEIA_DIR", "")
+	dir := t.TempDir()
+	writeFile(t, dir, "go.mod", "module x\n\ngo 1.23\n")
+	writeFile(t, dir, "fold.go", "package x\n\nfunc FoldConstants() {}\n")
+	runCLI(t, dir, "", "init")
+	hook := func(prompt string) string {
+		t.Helper()
+		in, _ := json.Marshal(map[string]string{"prompt": prompt, "session_id": "s-map", "cwd": dir})
+		var out, errb bytes.Buffer
+		run([]string{"hook"}, bytes.NewReader(in), &out, &errb)
+		return out.String()
+	}
+	if out := hook("fold constants in the optimizer"); !strings.Contains(out, "Code map for this prompt") ||
+		!strings.Contains(out, "fold.go: FoldConstants 3") {
+		t.Fatalf("first prompt should carry the code map: %q", out)
+	}
+	if out := hook("fold constants again"); out != "" {
+		t.Fatalf("the map is sent once per session, got %q", out)
+	}
+	if code, out, _ := runCLI(t, dir, "", "map", "fold"); code != 0 || !strings.Contains(out, "fold.go: FoldConstants 3") {
+		t.Fatalf("map command: %d %q", code, out)
+	}
+}

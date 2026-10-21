@@ -87,30 +87,32 @@ func NewIndex(docs []Doc) *Index {
 
 // Scores returns BM25 scores (only documents with a positive score).
 func (ix *Index) Scores(query []string) map[string]float64 {
+	w := map[string]float64{}
+	for _, t := range query {
+		w[t] = 1
+	}
+	return ix.WeightedScores(w)
+}
+
+// WeightedScores is Scores with a weight per query term, e.g. how often the
+// term occurs in a long prompt.
+func (ix *Index) WeightedScores(query map[string]float64) map[string]float64 {
 	out := map[string]float64{}
 	if len(ix.docs) == 0 || ix.avgdl == 0 {
 		return out
-	}
-	seen := map[string]bool{}
-	var q []string
-	for _, t := range query {
-		if !seen[t] {
-			seen[t] = true
-			q = append(q, t)
-		}
 	}
 	n := float64(len(ix.docs))
 	for i, d := range ix.docs {
 		dl := float64(len(d.Terms))
 		var score float64
-		for _, t := range q {
+		for t, weight := range query {
 			f := float64(ix.tf[i][t])
 			if f == 0 {
 				continue
 			}
 			df := float64(ix.df[t])
 			idf := math.Log(1 + (n-df+0.5)/(df+0.5))
-			score += idf * f * (k1 + 1) / (f + k1*(1-b+b*dl/ix.avgdl))
+			score += weight * idf * f * (k1 + 1) / (f + k1*(1-b+b*dl/ix.avgdl))
 		}
 		if score > 0 {
 			out[d.ID] = score

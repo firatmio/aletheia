@@ -103,7 +103,7 @@ aletheia init --agents
 
 Claude Code loads MCP tools on demand, so their descriptions rarely reach the model. The `CLAUDE.md` block written by `init --agents` is what makes it recall before exploring.
 
-To recall automatically on every prompt, add this hook to `.claude/settings.json`. Recall then costs the agent no tool call, and each memory is sent once per session:
+To recall automatically on every prompt, add this hook to `.claude/settings.json`. Recall then costs the agent no tool call, and each memory is sent once per session. The first prompt of a session also gets a short code map (see `aletheia map` below; `--map-budget 0` turns it off):
 
 ```json
 {
@@ -193,6 +193,22 @@ aletheia remember "…new claim…" --anchor … --supersedes 3f9a1c   # changed
 
 `--reseal` refuses if a `contains` or `exists` anchor no longer holds, so a false claim cannot be quietly blessed.
 
+## Code map
+
+`aletheia map "<topic>"` lists the files most relevant to a topic, each with its key declarations and their current lines:
+
+```
+optimizer/fold.go: fold.Visit 15-311, fold 10-13, toFloat 329-335
+builtin/builtin.go: Builtins 35-1081, Index 18
+```
+
+It is built from the files on every call, so it cannot go stale.
+- Go is parsed with `go/parser`; other languages are scanned for declaration keywords.
+- Files are ranked first, as in Aider's repo map, by how well their path and declaration names match the topic. Declarations come next, with the ones named in the topic first.
+- It skips hidden, dependency and generated files.
+
+The hook sends a map once per session, so even an agent with an empty memory starts at the right files.
+
 ## Token economy
 
 Memory should save tokens, not spend them. Aletheia is built around that:
@@ -227,7 +243,8 @@ aletheia verify [id] [--reseal] [--ttl 30d] [--json]   # exits 1 if anything is 
 aletheia lethe [--days 30] [--apply]                     # archive superseded and long-stale memories
 aletheia stats [--json]
 aletheia serve [--dir DIR]                               # MCP server on stdio
-aletheia hook [--budget N]                               # Claude Code UserPromptSubmit hook
+aletheia map [topic] [--budget 600]                      # where relevant declarations are
+aletheia hook [--budget N] [--map-budget N]              # Claude Code UserPromptSubmit hook
 ```
 
 `remember` exits with code `3` when the claim duplicates or closely matches an existing memory, and names it so the agent can `--supersedes` it instead.

@@ -1,7 +1,7 @@
 <!-- aletheia:begin -->
 ## Project memory (Aletheia)
 
-- Before exploring the codebase, run `aletheia recall "<topic>"` (or call the `recall` MCP tool), unless an "Aletheia project memory" block is already in your context.
+- Before exploring the codebase, run `aletheia recall "<topic>"` (or call the `recall` MCP tool), unless an "Aletheia project memory" block is already in your context. `aletheia map "<topic>"` lists where the relevant declarations are (`file: Name lines`); a "Code map" block in your context is the same.
 - `[ok]` = checked against the files just now. `[?]` = unanchored hint, verify before relying on it. `(file:12-40)` = where that code is right now: read those lines instead of the whole file. Stale memories are hidden: re-check them, then `aletheia verify <id> --reseal` or `aletheia remember "<new claim>" --supersedes <id>`.
 - After learning a durable fact, save it with evidence: `aletheia remember "<claim>" --anchor symbol:<path>::<Name>` or `--anchor contains:<path>::<regex>`.
   - One fact per memory; split "X and Y" into two.

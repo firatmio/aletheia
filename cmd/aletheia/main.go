@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/firatmio/aletheia/internal/codemap"
 	"github.com/firatmio/aletheia/internal/engine"
 	"github.com/firatmio/aletheia/internal/mcp"
 	"github.com/firatmio/aletheia/internal/store"
@@ -46,7 +47,9 @@ Usage:
   aletheia lethe [--days 30] [--apply] [--json]
   aletheia stats [--json]
   aletheia serve [--dir DIR]          MCP server on stdio
-  aletheia hook [--budget N]          Claude Code UserPromptSubmit hook (JSON on stdin)
+  aletheia map [topic] [--budget N]   where relevant declarations are (file: Name lines)
+  aletheia hook [--budget N] [--map-budget N]
+                                      Claude Code UserPromptSubmit hook (JSON on stdin)
   aletheia version
 
 Anchors (evidence a memory is checked against, relative to the project root):
@@ -102,6 +105,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return c.serve(rest)
 	case "hook":
 		return c.hook(rest)
+	case "map":
+		return c.mapCmd(rest)
 	}
 	fmt.Fprintf(stderr, "aletheia: unknown command %q\n\n%s", cmd, usage)
 	return exitUsage
@@ -393,7 +398,7 @@ const hookPreamble = "Aletheia project memory for this prompt " +
 // same session are skipped. It never blocks a prompt: on any problem it
 // prints nothing.
 func (c *cli) hook(args []string) int {
-	f, err := parseFlags(args, nil, []string{"budget", "limit"})
+	f, err := parseFlags(args, nil, []string{"budget", "limit", "map-budget"})
 	if err != nil {
 		return c.usageErr(err)
 	}
@@ -402,6 +407,10 @@ func (c *cli) hook(args []string) int {
 		return c.usageErr(err)
 	}
 	limit, err := f.intv("limit", 6)
+	if err != nil {
+		return c.usageErr(err)
+	}
+	mapBudget, err := f.intv("map-budget", 300)
 	if err != nil {
 		return c.usageErr(err)
 	}
@@ -424,13 +433,72 @@ func (c *cli) hook(args []string) int {
 	if err != nil {
 		res, err = e.Recall(engine.RecallOptions{Query: in.Prompt, Budget: budget, Limit: limit}) // odd session id
 	}
-	if err != nil || len(res.Hits) == 0 && len(res.HiddenStale) == 0 {
+	var parts []string
+	if err == nil && (len(res.Hits) > 0 || len(res.HiddenStale) > 0) {
+		parts = append(parts, hookPreamble+res.Text())
+	}
+	if mapBudget > 0 && firstInSession(e.Store, in.SessionID, "map") {
+		if m, err := codemap.Build(e.Store.Root); err == nil {
+			if s := m.Render(in.Prompt, mapBudget); s != "" {
+				parts = append(parts, mapPreamble+s)
+			}
+		}
+	}
+	if len(parts) == 0 {
 		return exitOK
 	}
 	_ = json.NewEncoder(c.out).Encode(map[string]any{"hookSpecificOutput": map[string]any{
 		"hookEventName":     "UserPromptSubmit",
-		"additionalContext": hookPreamble + res.Text(),
+		"additionalContext": strings.Join(parts, "\n\n"),
 	}})
+	return exitOK
+}
+
+// mapPreamble introduces the code map in the agent's context.
+const mapPreamble = "Code map for this prompt (file: Name lines, computed from the files just now; read those lines, not whole files):\n"
+
+// firstInSession records that what was sent once per session (e.g. the code
+// map) has gone out, and reports whether this is the first time. Without a
+// usable session id it always reports true.
+func firstInSession(st *store.Store, session, what string) bool {
+	if session == "" || strings.ContainsAny(session, `/\:.`) || len(session) > 64 {
+		return true
+	}
+	p := st.StateDir("sessions", session+"."+what)
+	if _, err := os.Stat(p); err == nil {
+		return false
+	}
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err == nil {
+		_ = os.WriteFile(p, nil, 0o644)
+	}
+	return true
+}
+
+// mapCmd prints the code map for a topic.
+func (c *cli) mapCmd(args []string) int {
+	f, err := parseFlags(args, nil, []string{"budget"})
+	if err != nil {
+		return c.usageErr(err)
+	}
+	budget, err := f.intv("budget", 600)
+	if err != nil {
+		return c.usageErr(err)
+	}
+	root := f.str("dir")
+	if e, err := c.open(f); err == nil {
+		root = e.Store.Root
+	} else if root == "" {
+		root = "."
+	}
+	m, err := codemap.Build(root)
+	if err != nil {
+		return c.fail(err)
+	}
+	out := m.Render(strings.Join(f.pos, " "), budget)
+	if out == "" {
+		out = "no matching declarations"
+	}
+	fmt.Fprintln(c.out, out)
 	return exitOK
 }
 
