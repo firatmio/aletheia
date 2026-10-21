@@ -38,6 +38,7 @@ type Hit struct {
 	Body       string    `json:"body,omitempty"`
 	Freshness  Freshness `json:"freshness"`
 	Reasons    []string  `json:"reasons,omitempty"`
+	Pointers   []string  `json:"pointers,omitempty"`
 	Confidence float64   `json:"confidence"`
 	Score      float64   `json:"score"`
 	Tokens     int       `json:"tokens"`
@@ -167,7 +168,7 @@ func (e *Engine) Recall(o RecallOptions) (*RecallResult, error) {
 			continue
 		}
 		h := Hit{
-			ID: c.m.ID, Claim: c.m.Claim, Freshness: v.Freshness, Reasons: v.Reasons,
+			ID: c.m.ID, Claim: c.m.Claim, Freshness: v.Freshness, Reasons: v.Reasons, Pointers: v.Pointers,
 			Confidence: c.m.Confidence, Score: c.rel * c.m.Confidence * freshnessFactor[v.Freshness],
 		}
 		if o.Full {

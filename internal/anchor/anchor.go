@@ -6,6 +6,8 @@
 //	contains:go.mod::go 1\.23   the file still matches this regular expression
 //	                            (runs of spaces/tabs match any run of spaces/tabs)
 //	exists:src/auth             the path still exists
+//	symbol:store.go::Store.Get  the file still declares this function, method,
+//	                            type, var or const
 //
 // Verification only reads files inside the project root. It never executes
 // anything, so a poisoned memory file cannot run code on the machine.
@@ -38,6 +40,7 @@ const (
 	KindFile     Kind = "file"
 	KindContains Kind = "contains"
 	KindExists   Kind = "exists"
+	KindSymbol   Kind = "symbol"
 )
 
 // ErrFormat is returned for malformed anchors.
@@ -45,8 +48,8 @@ var ErrFormat = errors.New("invalid anchor")
 
 var errMissing = errors.New("missing")
 
-// Anchor is a parsed anchor. Arg is the content hash for file anchors and
-// the regular expression for contains anchors.
+// Anchor is a parsed anchor. Arg is the content hash for file anchors, the
+// regular expression for contains anchors and the name for symbol anchors.
 type Anchor struct {
 	Kind Kind
 	Path string
@@ -55,8 +58,10 @@ type Anchor struct {
 
 // Result is the outcome of checking one anchor.
 type Result struct {
-	OK     bool
-	Detail string // short reason when !OK, e.g. "go.mod: changed"
+	OK      bool
+	Detail  string // short reason when !OK, e.g. "go.mod: changed"
+	Line    int    // first line of the match or declaration (contains, symbol); 0 if unknown
+	EndLine int    // last line of it
 }
 
 // String returns the canonical text form.
@@ -69,6 +74,8 @@ func (a Anchor) String() string {
 		return "file:" + a.Path + "@" + a.Arg
 	case KindContains:
 		return "contains:" + a.Path + "::" + a.Arg
+	case KindSymbol:
+		return "symbol:" + a.Path + "::" + a.Arg
 	default:
 		return "exists:" + a.Path
 	}
@@ -102,7 +109,7 @@ func cleanRel(p string) (string, error) {
 func Parse(raw string) (Anchor, error) {
 	kind, rest, ok := strings.Cut(strings.TrimSpace(raw), ":")
 	if !ok || rest == "" {
-		return Anchor{}, fmt.Errorf("%w: %q (want kind:path; kinds: file, contains, exists)", ErrFormat, raw)
+		return Anchor{}, fmt.Errorf("%w: %q (want kind:path; kinds: file, contains, exists, symbol)", ErrFormat, raw)
 	}
 	switch Kind(kind) {
 	case KindFile:
@@ -134,8 +141,18 @@ func Parse(raw string) (Anchor, error) {
 			return Anchor{}, err
 		}
 		return Anchor{Kind: KindExists, Path: cp}, nil
+	case KindSymbol:
+		p, name, ok := strings.Cut(rest, "::")
+		if !ok || !symbolName.MatchString(name) {
+			return Anchor{}, fmt.Errorf("%w: symbol needs path::Name or path::Type.Method", ErrFormat)
+		}
+		cp, err := cleanRel(p)
+		if err != nil {
+			return Anchor{}, err
+		}
+		return Anchor{Kind: KindSymbol, Path: cp, Arg: name}, nil
 	}
-	return Anchor{}, fmt.Errorf("%w: unknown kind %q (want file, contains, exists)", ErrFormat, kind)
+	return Anchor{}, fmt.Errorf("%w: unknown kind %q (want file, contains, exists, symbol)", ErrFormat, kind)
 }
 
 // resolve maps a project-relative path to a real path, refusing anything
@@ -314,10 +331,22 @@ func Check(root string, a Anchor) Result {
 		if err != nil {
 			return Result{Detail: a.Path + ": bad regex"}
 		}
-		if !re.Match(data) {
+		loc := re.FindIndex(data)
+		if loc == nil {
 			return Result{Detail: a.Path + ": pattern not found"}
 		}
-		return Result{OK: true}
+		start, end := lineOf(data, loc[0]), lineOf(data, max(loc[0], loc[1]-1))
+		return Result{OK: true, Line: start, EndLine: end}
+	case KindSymbol:
+		data, err := readHead(full)
+		if err != nil {
+			return Result{Detail: a.Path + ": " + err.Error()}
+		}
+		start, end, ok := findSymbol(a.Path, data, a.Arg)
+		if !ok {
+			return Result{Detail: a.Path + ": " + a.Arg + " not found"}
+		}
+		return Result{OK: true, Line: start, EndLine: end}
 	}
 	return Result{Detail: "unknown anchor kind"}
 }

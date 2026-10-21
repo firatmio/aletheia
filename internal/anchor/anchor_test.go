@@ -270,3 +270,86 @@ func TestReseal(t *testing.T) {
 		t.Fatal("reseal must not paper over a pattern that no longer holds")
 	}
 }
+
+func TestSymbolAnchor(t *testing.T) {
+	root := project(t)
+	write(t, root, "store.go", `package store
+
+// Store keeps links.
+type Store struct {
+	links map[string]string
+}
+
+const (
+	MaxLinks = 100
+	MinLen   = 5
+)
+
+var ErrNotFound = errors.New("not found")
+
+func (s *Store) Get(code string) (string, error) {
+	l, ok := s.links[code]
+	if !ok {
+		return "", ErrNotFound
+	}
+	return l, nil
+}
+
+func Open(path string) *Store { return &Store{} }
+`)
+	write(t, root, "views.py", "import os\n\nclass Router:\n    def resolve(self, path):\n        return path\n")
+	for spec, lines := range map[string][2]int{
+		"symbol:store.go::Store":          {4, 6},
+		"symbol:store.go::MinLen":         {10, 10}, // one spec of a grouped const block
+		"symbol:store.go::ErrNotFound":    {13, 13},
+		"symbol:store.go::Store.Get":      {15, 21},
+		"symbol:store.go::Open":           {23, 23},
+		"symbol:views.py::Router":         {3, 3},
+		"symbol:views.py::Router.resolve": {4, 4},
+	} {
+		a, err := Make(root, spec)
+		if err != nil {
+			t.Fatalf("%s: %v", spec, err)
+		}
+		if r := Check(root, a); !r.OK || r.Line != lines[0] || r.EndLine != lines[1] {
+			t.Errorf("%s: got %+v, want lines %v", spec, r, lines)
+		}
+	}
+	for _, spec := range []string{"symbol:store.go::Get", "symbol:store.go::Other.Get", "symbol:store.go::Nope"} {
+		if _, err := Make(root, spec); err == nil {
+			t.Errorf("%s must not hold", spec)
+		}
+	}
+	if _, err := Parse("symbol:store.go::not a name"); err == nil {
+		t.Error("symbol names are identifiers")
+	}
+
+	// An unrelated edit keeps the anchor, a rename stales it.
+	a, _ := Make(root, "symbol:store.go::Store.Get")
+	write(t, root, "store.go", "package store\n\nfunc helper() {}\n\nfunc (s *Store) Get(code string) (string, error) { return \"\", nil }\n")
+	if r := Check(root, a); !r.OK || r.Line != 5 {
+		t.Fatalf("unrelated edit: %+v", r)
+	}
+	write(t, root, "store.go", "package store\n\nfunc (s *Store) Lookup(code string) (string, error) { return \"\", nil }\n")
+	if r := Check(root, a); r.OK || !strings.Contains(r.Detail, "Store.Get not found") {
+		t.Fatalf("rename must stale: %+v", r)
+	}
+}
+
+func TestContainsReportsLines(t *testing.T) {
+	root := project(t)
+	write(t, root, "fold.go", "package x\n\nfunc fold() {\n\tswitch name {\n\tcase \"clamp\":\n\t}\n}\n")
+	for spec, lines := range map[string][2]int{
+		`contains:fold.go::case "clamp":`:               {5, 5},
+		`contains:fold.go::switch name \{\n`:            {4, 4},
+		`contains:fold.go::func fold\(\) \{\n\s+switch`: {3, 4},
+	} {
+		a, err := Make(root, spec)
+		if err != nil {
+			t.Fatalf("%s: %v", spec, err)
+		}
+		if r := Check(root, a); r.Line != lines[0] || r.EndLine != lines[1] {
+			t.Errorf("%s: got lines %d-%d, want %v", spec, r.Line, r.EndLine, lines)
+		}
+	}
+}

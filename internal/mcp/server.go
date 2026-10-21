@@ -170,14 +170,16 @@ func toolDefs() []map[string]any {
 		{
 			"name": "recall",
 			"description": "Search project memory before exploring the codebase. Each line: id [ok|?] claim. " +
-				"[ok]=verified against the files now, [?]=unanchored hint. Stale memories are hidden (stale=true shows them).",
+				"[ok]=verified against the files now, [?]=unanchored hint, (file:12-40)=where it is now: read those lines. " +
+				"Stale memories are hidden (stale=true shows them).",
 			"inputSchema": obj(map[string]any{
 				"query": str, "budget": num, "full": flag, "stale": flag, "session": str, "tag": str,
 			}),
 		},
 		{
 			"name": "remember",
-			"description": "Save one durable fact (one per call) with evidence. anchors: contains:go.mod::go 1\\.23 " +
+			"description": "Save one durable fact (one per call) with evidence. anchors: symbol:store.go::Store.Get " +
+				"(a declaration), contains:go.mod::go 1\\.23 " +
 				"(regex on the line that proves the claim, not a comment or name), exists:src/auth, " +
 				"file:go.mod (content hash; any edit stales it, avoid on busy files). Anchors must hold now. " +
 				"Absence claims (\"no auth\"): no anchors, ttl 30d. " +

@@ -267,6 +267,75 @@ func TestRememberWarnsAboutCommentOnlyAnchors(t *testing.T) {
 	}
 }
 
+func TestRecallShowsLivePointers(t *testing.T) {
+	v := newEnv(t)
+	v.write(t, "lib.go", "package x\n\nfunc Clamp(x, lo, hi int) int {\n\treturn min(max(x, lo), hi)\n}\n")
+	v.remember(t, RememberInput{
+		Claim:   "Clamp limits a value to a range",
+		Anchors: []string{"symbol:lib.go::Clamp", "exists:go.mod"},
+	})
+	res, _ := v.e.Recall(RecallOptions{Query: "clamp"})
+	if got := res.Text(); !strings.Contains(got, "Clamp limits a value to a range (lib.go:3-5)") {
+		t.Fatalf("want the declaration's current lines: %q", got)
+	}
+	// Code above it moves the pointer; the memory stays verified.
+	v.write(t, "lib.go", "package x\n\nimport \"fmt\"\n\nvar _ = fmt.Sprint\n\nfunc Clamp(x, lo, hi int) int {\n\treturn min(max(x, lo), hi)\n}\n")
+	res, _ = v.e.Recall(RecallOptions{Query: "clamp"})
+	if got := res.Text(); !strings.Contains(got, "[ok] Clamp limits a value to a range (lib.go:7-9)") {
+		t.Fatalf("pointer must follow the code: %q", got)
+	}
+}
+
+func TestFilesNamedInClaimAreAnchored(t *testing.T) {
+	v := newEnv(t)
+	for _, d := range []string{"builtin", "docs"} {
+		if err := os.MkdirAll(filepath.Join(v.root, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	v.write(t, "builtin/builtin.go", "package builtin\n\nvar Builtins = []string{}\n")
+	v.write(t, "builtin/lib.go", "package builtin\n\nfunc Clamp() {}\n")
+	v.write(t, "docs/language.md", "# Builtins\n")
+	v.write(t, ".gitignore", "/dist\n")
+
+	m, verdict, err := v.e.Remember(RememberInput{
+		Claim: "New builtin: register in builtin/builtin.go, implement in builtin/lib.go (e.g. fold.Visit, see ../secret.txt), " +
+			"document in docs/language.md and docs/missing.md; ignored files are listed in .gitignore.",
+		Anchors: []string{"symbol:builtin/lib.go::Clamp"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"symbol:builtin/lib.go::Clamp", "exists:builtin/builtin.go", "exists:docs/language.md", "exists:.gitignore"}
+	if strings.Join(m.Anchors, " ") != strings.Join(want, " ") {
+		t.Fatalf("anchors = %q, want %q", m.Anchors, want)
+	}
+	if verdict.Freshness != Verified || len(verdict.Notes) != 2 || !strings.Contains(verdict.Notes[0], "files named in the claim") ||
+		verdict.Notes[1] != "the claim names files that do not exist: docs/missing.md" {
+		t.Fatalf("verdict = %+v", verdict)
+	}
+	if m.Expires != nil {
+		t.Fatal("a memory with explicit anchors does not expire by default")
+	}
+
+	// The rename that slipped past the agent's own anchors in the lab now stales the memory.
+	if err := os.Rename(filepath.Join(v.root, "builtin/builtin.go"), filepath.Join(v.root, "builtin/registry.go")); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := v.e.Verify(m.ID); got.Freshness != Stale || !strings.Contains(strings.Join(got.Reasons, " "), "builtin/builtin.go: missing") {
+		t.Fatalf("want stale after the rename, got %+v", got)
+	}
+
+	// Named files do not turn an unanchored claim into a lasting fact.
+	hint, _, err := v.e.Remember(RememberInput{Claim: "Nothing in docs/language.md explains folding yet", Force: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hint.Anchors) != 1 || hint.Expires == nil {
+		t.Fatalf("want an exists: anchor and the default expiry, got %q %v", hint.Anchors, hint.Expires)
+	}
+}
+
 func TestUnanchoredRanksBelowVerified(t *testing.T) {
 	v := newEnv(t)
 	v.remember(t, RememberInput{Claim: "Linting runs in CI hint", Force: true})

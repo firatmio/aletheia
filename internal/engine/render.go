@@ -22,9 +22,18 @@ func Label(f Freshness, reasons []string) string {
 	return "stale: " + strings.Join(reasons, "; ")
 }
 
+// maxPointers caps the "file:lines" shown per memory to keep recall short.
+const maxPointers = 4
+
 func renderHit(h Hit) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s [%s] %s", h.ID, Label(h.Freshness, h.Reasons), h.Claim)
+	if p := h.Pointers; len(p) > 0 {
+		if len(p) > maxPointers {
+			p = p[:maxPointers]
+		}
+		fmt.Fprintf(&b, " (%s)", strings.Join(p, ", "))
+	}
 	if h.Body != "" {
 		for _, l := range strings.Split(h.Body, "\n") {
 			b.WriteString("\n  ")

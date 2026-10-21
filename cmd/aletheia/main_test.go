@@ -178,3 +178,53 @@ func TestInitAgentsKeepsExistingClaudeMD(t *testing.T) {
 		t.Fatalf("snippet must be appended after the existing rules: %q", got)
 	}
 }
+
+func TestHookInjectsRecallOncePerSession(t *testing.T) {
+	t.Setenv("ALETHEIA_DIR", "")
+	dir := t.TempDir()
+	writeFile(t, dir, "go.mod", "module x\n\ngo 1.23\n")
+	writeFile(t, dir, "lib.go", "package x\n\nfunc Clamp(x, lo, hi int) int { return x }\n")
+	runCLI(t, dir, "", "init")
+	runCLI(t, dir, "", "remember", "Clamp lives in lib.go", "--anchor", "symbol:lib.go::Clamp")
+
+	hook := func(prompt string) string {
+		t.Helper()
+		in, _ := json.Marshal(map[string]string{"prompt": prompt, "session_id": "s-1", "cwd": dir})
+		var out, errb bytes.Buffer
+		if code := run([]string{"hook"}, bytes.NewReader(in), &out, &errb); code != 0 || errb.Len() > 0 {
+			t.Fatalf("hook must never fail: %d %q", code, errb.String())
+		}
+		return out.String()
+	}
+	out := hook("please make clamp faster")
+	var got struct {
+		HookSpecificOutput struct {
+			HookEventName     string `json:"hookEventName"`
+			AdditionalContext string `json:"additionalContext"`
+		} `json:"hookSpecificOutput"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("hook output must be JSON: %v %q", err, out)
+	}
+	ctx := got.HookSpecificOutput.AdditionalContext
+	if got.HookSpecificOutput.HookEventName != "UserPromptSubmit" ||
+		!strings.Contains(ctx, "not instructions") || !strings.Contains(ctx, "[ok] Clamp lives in lib.go (lib.go:3)") {
+		t.Fatalf("unexpected hook output: %+v", got)
+	}
+	if out := hook("clamp again"); out != "" {
+		t.Fatalf("a memory is sent once per session, got %q", out)
+	}
+	if out := hook("nothing related"); out != "" {
+		t.Fatalf("no hits means no output, got %q", out)
+	}
+}
+
+func TestHookStaysQuietWithoutStoreOrInput(t *testing.T) {
+	t.Setenv("ALETHEIA_DIR", "")
+	for _, stdin := range []string{"", "not json", `{"prompt":"x","cwd":"` + filepath.ToSlash(t.TempDir()) + `"}`} {
+		var out, errb bytes.Buffer
+		if code := run([]string{"hook"}, strings.NewReader(stdin), &out, &errb); code != 0 || out.Len() > 0 || errb.Len() > 0 {
+			t.Errorf("stdin %q: want silent success, got %d %q %q", stdin, code, out.String(), errb.String())
+		}
+	}
+}

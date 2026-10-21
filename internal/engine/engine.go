@@ -6,6 +6,9 @@ package engine
 import (
 	"errors"
 	"fmt"
+	"path"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -43,6 +46,9 @@ type Verdict struct {
 	Freshness Freshness `json:"freshness"`
 	Reasons   []string  `json:"reasons,omitempty"`
 	Notes     []string  `json:"notes,omitempty"` // advice from Remember; Judge never sets it
+	// Pointers say where the evidence is right now, e.g. "store.go:15-21",
+	// so an agent can read those lines instead of the whole file.
+	Pointers []string `json:"pointers,omitempty"`
 }
 
 // Engine runs memory operations against one store.
@@ -72,9 +78,12 @@ func (e *Engine) Judge(m *store.Memory) Verdict {
 			}
 			continue
 		}
-		if r := anchor.Check(e.Store.Root, a); !r.OK {
+		r := anchor.Check(e.Store.Root, a)
+		if !r.OK {
 			v.Reasons = append(v.Reasons, r.Detail)
 			v.Freshness = Stale
+		} else if r.Line > 0 {
+			v.Pointers = append(v.Pointers, pointer(a.Path, r.Line, r.EndLine))
 		}
 	}
 	if m.Expires != nil && e.now().After(*m.Expires) {
@@ -82,6 +91,49 @@ func (e *Engine) Judge(m *store.Memory) Verdict {
 		v.Freshness = Stale
 	}
 	return v
+}
+
+func pointer(path string, start, end int) string {
+	if end > start {
+		return fmt.Sprintf("%s:%d-%d", path, start, end)
+	}
+	return fmt.Sprintf("%s:%d", path, start)
+}
+
+// pathToken matches words that look like project paths: "builtin/lib.go",
+// "go.mod", "docs/". Identifiers such as fold.Visit match too, but only
+// paths that exist become anchors.
+var pathToken = regexp.MustCompile(`[A-Za-z0-9_.\-]+(?:[/\\][A-Za-z0-9_.\-]*)*`)
+
+// maxNamedPaths caps how many anchors anchorNamedPaths adds to one memory.
+const maxNamedPaths = 8
+
+// anchorNamedPaths returns exists: anchors for files and directories named
+// in the claim that exist and are not already covered by an anchor. A claim
+// such as "register new builtins in builtin/builtin.go" then goes stale when
+// that file is renamed, even if the agent anchored only other files. It
+// also returns paths with a directory and an extension that do not exist:
+// a claim naming them is probably wrong already.
+func (e *Engine) anchorNamedPaths(claim string, covered map[string]bool) (added, missing []string) {
+	for _, tok := range pathToken.FindAllString(claim, -1) {
+		tok = strings.TrimRight(tok, ".-")
+		if !strings.ContainsAny(tok, "./\\") {
+			continue // a bare word
+		}
+		a, err := anchor.Make(e.Store.Root, "exists:"+tok)
+		if err != nil {
+			if strings.ContainsAny(tok, "/\\") && path.Ext(filepath.ToSlash(tok)) != "" && !strings.Contains(tok, "..") {
+				missing = append(missing, tok)
+			}
+			continue
+		}
+		if covered[a.Path] || len(added) == maxNamedPaths {
+			continue
+		}
+		covered[a.Path] = true
+		added = append(added, a.String())
+	}
+	return added, missing
 }
 
 // RememberInput describes a new memory.
@@ -201,6 +253,7 @@ func (e *Engine) Remember(in RememberInput) (*store.Memory, Verdict, error) {
 	}
 
 	var anchors, notes []string
+	covered := map[string]bool{}
 	for _, spec := range in.Anchors {
 		a, err := anchor.Make(e.Store.Root, spec)
 		if err != nil {
@@ -210,9 +263,20 @@ func (e *Engine) Remember(in RememberInput) (*store.Memory, Verdict, error) {
 			notes = append(notes, a.String()+" only matches comments, which can stay while the code changes; anchor the code itself")
 		}
 		anchors = append(anchors, a.String())
+		covered[a.Path] = true
+	}
+	explicit := len(anchors)
+	added, missing := e.anchorNamedPaths(claim, covered)
+	if len(added) > 0 {
+		anchors = append(anchors, added...)
+		notes = append(notes, "added anchors for files named in the claim: "+strings.Join(added, ", "))
+	}
+	if len(missing) > 0 {
+		notes = append(notes, "the claim names files that do not exist: "+strings.Join(missing, ", "))
 	}
 	ttl := in.TTL
-	if ttl == 0 && len(anchors) == 0 {
+	if ttl == 0 && explicit == 0 { // exists: anchors on named files say little about the claim itself
+
 		ttl = UnanchoredTTL
 		notes = append(notes, fmt.Sprintf("no anchors: expires in %dd unless re-confirmed with verify --reseal",
 			int(UnanchoredTTL.Hours()/24)))

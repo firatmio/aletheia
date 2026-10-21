@@ -102,6 +102,16 @@ aletheia init --agents
 ```
 
 Claude Code loads MCP tools on demand, so their descriptions rarely reach the model. The `CLAUDE.md` block written by `init --agents` is what makes it recall before exploring.
+
+To recall automatically on every prompt, add this hook to `.claude/settings.json`. Recall then costs the agent no tool call, and each memory is sent once per session:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "aletheia hook" }] }]
+  }
+}
+```
 </details>
 
 <details>
@@ -164,9 +174,12 @@ The MCP server exposes four tools: `recall`, `remember`, `get`, `verify`.
 | `file:PATH` | the file's content is unchanged (hash sealed when saved) | `file:go.mod` |
 | `contains:PATH::REGEX` | the file still matches the regular expression | `contains:go.mod::^go 1\.23$` |
 | `exists:PATH` | the path still exists | `exists:src/auth` |
+| `symbol:PATH::NAME` | the file still declares that function, method (`Type.Method`), type, var or const | `symbol:store.go::Store.Get` |
 
-- Use `contains` for claims about *one thing* in a file, and `file` when any change should trigger a re-check.
+- Use `symbol` for claims about one declaration, `contains` for claims about *one thing* in a file, and `file` when any change should trigger a re-check.
+- Recall shows where `symbol` and `contains` evidence is right now, e.g. `(store.go:15-21)`, so the agent reads those lines instead of the whole file. Line numbers are computed on every recall, so they never go stale. Go declarations are parsed with `go/parser` and get their full line range; other languages are matched by a declaration keyword and get one line.
 - In a `contains` pattern, a run of spaces or tabs matches any run of spaces or tabs, so reformatting (gofmt, prettier) does not stale it.
+- Files and directories named in a claim ("register in `builtin/registry.go`") get an `exists:` anchor automatically when they exist. Renaming them stales the memory even if no other anchor points there.
 - Anchor the code that does the thing, not a comment about it. `remember` warns when a `contains` anchor only matches comments, since a comment can stay while the code changes.
 - Add `--ttl 30d` for facts that age on their own ("staging is being migrated this week").
 - A memory with no anchors is allowed. It comes back as `[?]`, a hint ranked below verified facts. Nothing can mark it stale, so it expires after 90 days unless you set `--ttl` or re-confirm it with `verify --reseal`.
@@ -214,6 +227,7 @@ aletheia verify [id] [--reseal] [--ttl 30d] [--json]   # exits 1 if anything is 
 aletheia lethe [--days 30] [--apply]                     # archive superseded and long-stale memories
 aletheia stats [--json]
 aletheia serve [--dir DIR]                               # MCP server on stdio
+aletheia hook [--budget N]                               # Claude Code UserPromptSubmit hook
 ```
 
 `remember` exits with code `3` when the claim duplicates or closely matches an existing memory, and names it so the agent can `--supersedes` it instead.
