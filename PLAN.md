@@ -104,6 +104,13 @@ claude mcp add aletheia -- aletheia serve
 ```
 Record a handful of real memories about this repo (anchored). Watch how Claude Code actually uses the tools; tighten descriptions where it misuses them. Do **not** commit `.aletheia/` in this repo until we decide whether dogfood memories belong in the public repo.
 
+Status 2026-10-21 (first pass, details in `docs/dogfood-4.2.md`):
+- Done: installed, `init --agents`, MCP registered (local scope), 25 real memories recorded via CLI. `.aletheia/` is excluded via `.git/info/exclude`.
+- Anchorability: 52% strong, 24% proxy, 24% none.
+- Edit experiment (21 edits): 7/14 false claims caught; **4 false `[ok]`**, all from proxy anchors; 3 silent `[?]`; **6/7 harmless edits staled a true memory**.
+- Recall: top-1 relevant on 4/8 natural questions.
+- Still open: watch a real Claude Code session use the MCP tools (needs a new session); run `aletheia verify` weekly and log real stale / false `[ok]` cases; decide on the fixes in section 5 of the log.
+
 ### 4.3 First release
 - Run `goreleaser check` and `goreleaser release --snapshot --clean` locally.
 - Tag `v0.1.0`. Verify `go install github.com/firatmio/aletheia/cmd/aletheia@latest` works from a clean machine.
