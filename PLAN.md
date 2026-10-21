@@ -121,6 +121,33 @@ Status 2026-10-21 (first pass, details in `docs/dogfood-4.2.md`):
 - Fırat wants "cute but professional", possibly with GIFs. Options: keep SVGs (crisp, tiny), or record a real terminal GIF with [VHS](https://github.com/charmbracelet/vhs) from a `docs/demo.tape`. Ask him before adding binary GIFs.
 - Consider a dark-mode banner variant via `<picture>` + `prefers-color-scheme`.
 
+### 4.5 Token-saving direction (decided with Fırat, 2026-10-21)
+Aletheia has no claim yet. The goal is to **save tokens without losing quality**, because without a clear saving nobody has a reason to use it. Verification (stale memories never reach the agent) stays the differentiator, and the saving is built on top of it.
+
+**What the data says** (R3 on expr-lang/expr, `docs/dogfood-4.2.md` §8):
+- Every session starts at about 20k tokens of fixed context and grows to 40–50k.
+- Billed cost splits roughly into cache reads 35–45% (turns × context), cache writes 30–40% (everything read gets written once), and output 25–30%.
+- Memory can only cut reads and turns, so the realistic ceiling on edit tasks is about 20–40%.
+- The one clear saving so far: a map memory made the next task of the same kind 40% cheaper, because the agent read a third as much before its first edit and needed fewer turns.
+
+**Lessons from other projects:**
+- **Aider's repo map:** an automatic, always-fresh, token-budgeted map, with no agent effort.
+- **Codebase-Memory MCP:** about 10× fewer tokens on structural questions, but 83% answer quality. Savings can cost quality.
+- **SWE-agent:** windowed reads beat whole-file reads, for focus as well as for cost.
+- **ACE vs ALTK-Evolve:** injecting a whole playbook every step is expensive, and rewriting context wholesale loses information. Keep recall small and updates incremental, as we already do.
+- **arXiv 2607.12161:** cutting tool-output tokens by 38% raised the bill by 7%, because agents compensated with more turns. Judge by **cost per successful task**, end to end.
+
+**Plan, in order:**
+1. **Automatic recall via hook.** `aletheia hook` for Claude Code's `UserPromptSubmit`: recall on the prompt text and inject the result. This saves the recall turn and guarantees memory is used. `init --agents` (or a flag) prints or installs the hook config.
+2. **Live pointers in recall.** Memories that name symbols show their current `file:start-end` at recall time (e.g. `Builtins → builtin/registry.go:35-1081`), so the agent reads 15 lines instead of a 1000-line file. Pointers are computed on every recall, so they never go stale. Verified memory plus live pointers is what no competitor has.
+3. **`symbol:` anchors** (pulled forward from v0.2). They are needed for 2, and they close the remaining false-`[ok]` classes (unused constant, name still present elsewhere). Use `go/parser` for Go (stdlib) and regex for other languages first.
+4. **Automatic structure map.** An Aider-style ranked symbol map within a token budget, built without the agent writing anything. Use the stdlib only, cache it under `.aletheia/.state/`, rebuildable (invariant 1).
+5. **Measure after each step** with the R3 harness (`lab-runs/r3/`), by cost per successful task:
+   - one replicate per step for direction, 2–3 before any README number;
+   - add task types where maps should help most: repeated change kinds and "how does X work?" architecture questions.
+
+**Positioning until numbers exist:** "memory that never feeds the agent stale facts, and remembers how recurring changes are done". Make no token-saving claim before step 5 produces one.
+
 ## 5. Roadmap
 
 **v0.2: smarter anchors**
@@ -130,6 +157,7 @@ Status 2026-10-21 (first pass, details in `docs/dogfood-4.2.md`):
 
 **v0.3: prove the token claim** (important for launch credibility)
 - First run (R3, 2026-10-21, `docs/dogfood-4.2.md` §8): on expr-lang/expr, 4 tasks × 2 reps, Aletheia was **not cheaper** (+9% cost, +20% input tokens, same turns, 16/16 success both arms). Stale handling worked. Agents save gotchas, not navigation; next try navigation memories and mistake-avoidance tasks.
+- R3-nav (map-memory rule, PR #3, 1 rep): break-even overall; the next same-kind task was 40% cheaper; no effect on a new kind of change. Follow-up plan: 4.5.
 - Benchmark harness: run the same coding tasks with (a) no memory, (b) naive append-only memory, (c) Aletheia; measure input tokens per task and task success. Include a "stale trap" scenario (a fact changes mid-run). Publish method and numbers in the README; no numbers before this exists.
 
 **v0.4: reach**
