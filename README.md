@@ -1,50 +1,51 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="Aletheia: memory for AI agents that checks itself against reality" width="100%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/aletheia-lockup-dark.svg">
+    <img src="assets/brand/aletheia-lockup.svg" alt="aletheia" width="300">
+  </picture>
+</p>
+
+<h3 align="center">Memory your coding agent can verify.</h3>
+
+<p align="center">
+  Every memory carries evidence from your code. Aletheia re-checks it on every recall,<br>
+  points your agent at the exact lines, and keeps stale facts out of its context.
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1f9e8f?style=flat-square"></a>
-  <img alt="Go 1.24+" src="https://img.shields.io/badge/go-1.24%2B-6d5fa6?style=flat-square">
-  <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-0-e0912f?style=flat-square">
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-stdio-1f1d2b?style=flat-square">
-</p>
-
-<p align="center">
-  <b>Every memory carries evidence. Evidence is re-checked on every recall.<br>
-  Stale memories never reach your agent's context.</b>
+  <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-142033?style=flat-square"></a>
+  <img alt="Go 1.24+" src="https://img.shields.io/badge/go-1.24%2B-142033?style=flat-square">
+  <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-0-0f7a5a?style=flat-square">
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-stdio-142033?style=flat-square">
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
-  <a href="#connect-your-agent">Connect your agent</a> ·
-  <a href="#anchors">Anchors</a> ·
-  <a href="#token-economy">Token economy</a> ·
-  <a href="#roadmap">Roadmap</a>
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#results">Results</a> ·
+  <a href="#reference">Reference</a>
 </p>
 
----
+<!-- Demo GIF of a real Claude Code session goes here (recorded with VHS). -->
 
 ## The problem
 
-Agent memory tools are good at *storing* facts and *finding* them again. They are bad at noticing when a fact stops being true.
+Coding agents forget everything between sessions, so they re-read the same files every time. Memory tools fix the forgetting, but they rank memories by similarity, and an outdated memory looks just as relevant as the fact that replaced it. The agent then builds on something that stopped being true weeks ago. A confidently wrong memory is worse than no memory.
 
-Retrieval ranks by similarity, and an outdated memory is exactly as similar to your question as the fact that replaced it. So the agent confidently recalls "the project uses Go 1.23" three weeks after someone upgraded to 1.24, then builds on it. **A confidently wrong memory is worse than no memory at all.**
-
-## The idea
-
-Aletheia stores each memory as a **claim plus anchors**: small pieces of evidence tied to your project's files. Every time a memory is recalled, its anchors are checked against the files *right now*.
+## How it works
 
 <p align="center">
-  <img src="assets/demo.svg" alt="Demo: a memory is verified, goes stale when go.mod changes, is hidden from recall, and is superseded" width="100%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works-dark.svg">
+    <img src="assets/how-it-works-light.svg" alt="On every prompt Aletheia adds verified memories and a code map with line pointers; the agent reads the exact lines; when it stops, Aletheia records which files the task changed." width="100%">
+  </picture>
 </p>
 
-<p align="center">
-  <img src="assets/states.svg" alt="Freshness states: verified, unanchored, stale" width="100%">
-</p>
-
-- Checks are **mechanical**: file hashes, regex matches, path existence. No LLM calls, no embeddings, no network.
-- A memory **cannot be created** if its own evidence already contradicts it.
-- Nothing is ever deleted. Replaced memories are `superseded`; long-dead ones are archived by `aletheia lethe` (Lethe, the river of forgetting).
+- **Memories carry evidence.** Each memory is a claim plus anchors: a function that must still exist, a line that must still match, a file that must still be there.
+- **Evidence is checked on every recall.** The checks are mechanical: no model calls, no embeddings, no network. A memory whose evidence broke is hidden from the agent, and a one-line note says so.
+- **Recall points at lines.** A pointer such as `builtin_test.go:263` is computed from the files right now, so the agent opens the right lines instead of searching for them.
+- **Maps write themselves.** When the agent stops, Aletheia reads the session transcript and records which files the task changed. The next task of the same kind starts there, and the agent spends no turns writing it down.
+- **Nothing is deleted.** Replaced memories are superseded and long-stale ones archived by `aletheia lethe` (Lethe, the river of forgetting).
 
 ## Quick start
 
@@ -52,21 +53,95 @@ Aletheia stores each memory as a **claim plus anchors**: small pieces of evidenc
 go install github.com/firatmio/aletheia/cmd/aletheia@latest
 
 cd your-project
-aletheia init --agents        # creates .aletheia/ and adds usage notes to CLAUDE.md and AGENTS.md
-
-aletheia remember "Auth tokens are issued in src/auth/jwt.go" \
-  --anchor file:src/auth/jwt.go \
-  --anchor 'contains:src/auth/jwt.go::func IssueToken\(' \
-  --tag auth
-
-aletheia recall "auth token"
-# 3f9a1c [ok] Auth tokens are issued in src/auth/jwt.go
+aletheia init --agents     # creates .aletheia/ and adds usage notes to CLAUDE.md and AGENTS.md
 ```
 
-Memories live in `.aletheia/memories/*.md` as plain Markdown with frontmatter. Commit them and your whole team (and every agent) shares one memory that verifies itself on each machine.
+For Claude Code, add the two hooks to `.claude/settings.json`. Recall then happens on every prompt and costs the agent nothing:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "aletheia hook" }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "aletheia hook" }] }]
+  }
+}
+```
+
+Memories live in `.aletheia/memories/*.md` as plain Markdown. Commit them and your team, and every agent, shares one memory that verifies itself on each machine.
+
+## Results
+
+We measured with headless Claude Code (Opus 5.5) on real repositories. Each task ran with and without Aletheia, and the same hidden acceptance tests judged success.
+
+| Repository | Tasks | Cost | Read before first edit | Tasks passed |
+|---|---|---|---|---|
+| [expr-lang/expr](https://github.com/expr-lang/expr), a mid-size expression language | 4 related tasks, 3 runs each | **−12%** | **−60%** on the first task | 12/12, same as without |
+| [go-chi/chi](https://github.com/go-chi/chi), a small, tidy router | 7 small tasks, paired | +5% | less on 5 of 7 tasks | 7/7, same as without |
+
+Aletheia pays off where finding the right place is expensive, in mid-size and larger codebases. On a small package that an agent reads in one or two calls there is little to save. The method, the raw numbers and what did not work are in [docs/dogfood-4.2.md](docs/dogfood-4.2.md).
+
+## Reference
 
 <details>
-<summary><b>What a memory file looks like</b></summary>
+<summary><b>Anchors</b></summary>
+
+| Anchor | Holds while | Example |
+|---|---|---|
+| `symbol:PATH::NAME` | the file still declares that function, method (`Type.Method`), type, var or const | `symbol:store.go::Store.Get` |
+| `contains:PATH::REGEX` | the file still matches the regular expression | `contains:go.mod::^go 1\.23$` |
+| `exists:PATH` | the path still exists | `exists:src/auth` |
+| `file:PATH` | the file's content is unchanged (hash sealed when saved) | `file:go.mod` |
+
+- Use `symbol` for claims about one declaration and `contains` for one thing in a file. Use `file` only when any change should trigger a re-check.
+- Recall shows where `symbol` and `contains` evidence is right now, e.g. `(store.go:15-21)`. Go declarations get their full range from `go/parser`; other languages get the declaring line.
+- In a `contains` pattern, a run of spaces matches any run of spaces or tabs, so reformatting does not stale it.
+- Files named in a claim get an `exists:` anchor automatically.
+- `remember` warns when a `contains` anchor only matches comments, since a comment can stay while the code changes.
+- A memory without anchors comes back as `[?]`, ranked below verified facts, and expires after 90 days unless re-confirmed.
+
+When a memory goes stale, re-check the claim, then:
+
+```bash
+aletheia verify 3f9a1c --reseal                                   # still true: refresh the evidence
+aletheia remember "…new claim…" --anchor … --supersedes 3f9a1c   # changed: replace it
+```
+
+`--reseal` refuses when a `contains`, `exists` or `symbol` anchor no longer holds, so a false claim cannot be quietly blessed.
+</details>
+
+<details>
+<summary><b>Code map</b></summary>
+
+`aletheia map "<topic>"` lists the files most relevant to a topic, each with its key declarations and their current lines:
+
+```
+optimizer/fold.go: fold.Visit 15-311, fold 10-13, toFloat 329-335
+builtin/builtin.go: Builtins 35-1081, Index 18
+```
+
+Files are ranked first, as in Aider's repo map, by how well their path and declaration names match the topic. Hidden, dependency and generated files are skipped. The hook sends a map with the first prompt of a session, sized to the project: none under 25 source files, then 300 or 600 tokens (`--map-budget N` overrides it).
+</details>
+
+<details>
+<summary><b>Other agents: Claude Desktop, VS Code, Cursor, Codex, Aider</b></summary>
+
+Aletheia speaks MCP over stdio with four tools (`recall`, `remember`, `get`, `verify`) and works as a plain CLI, so any agent that can run a shell command can use it.
+
+```json
+{
+  "mcpServers": {
+    "aletheia": { "command": "aletheia", "args": ["serve", "--dir", "/absolute/path/to/your-project"] }
+  }
+}
+```
+
+- **VS Code** (`.vscode/mcp.json`): use `"servers"` instead of `"mcpServers"`, and `${workspaceFolder}` as the directory.
+- **Claude Code:** `claude mcp add aletheia -- aletheia serve`. The hooks above matter more, because Claude Code loads MCP tool descriptions on demand.
+- **Agents without MCP** (Codex, Aider, custom agents): `aletheia init --agents` writes a short block to `AGENTS.md` that teaches the agent to call the CLI. Add `--json` to any read command for machine-readable output.
+</details>
+
+<details>
+<summary><b>A memory file</b></summary>
 
 ```markdown
 ---
@@ -80,163 +155,17 @@ updated: "2026-10-21T09:12:44Z"
 tags:
   - "auth"
 anchors:
-  - "file:src/auth/jwt.go@9b1d0c…"
-  - "contains:src/auth/jwt.go::func IssueToken\\("
+  - "symbol:src/auth/jwt.go::IssueToken"
+  - "exists:src/auth/jwt.go"
 ---
-Tokens are HS256, 15 minute expiry. Refresh lives in refresh.go.
+Tokens are HS256 with a 15 minute expiry. Refresh lives in refresh.go.
 ```
 
-Edit them by hand, review them in pull requests, grep them. They are just files.
-</details>
-
-## Connect your agent
-
-Aletheia speaks **MCP over stdio** and also works as a plain **CLI**, so any agent that can run a shell command can use it.
-
-<details open>
-<summary><b>Claude Code</b></summary>
-
-```bash
-claude mcp add aletheia -- aletheia serve
-aletheia init --agents
-```
-
-Claude Code loads MCP tools on demand, so their descriptions rarely reach the model. The `CLAUDE.md` block written by `init --agents` is what makes it recall before exploring.
-
-For the cheapest setup, add these hooks to `.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "aletheia hook" }] }],
-    "Stop": [{ "hooks": [{ "type": "command", "command": "aletheia hook" }] }]
-  }
-}
-```
-
-- **On every prompt**, Aletheia recalls for you. The agent spends no tool call on it, and each memory is sent once per session.
-- **On the first prompt of a session**, the agent also gets a code map (see `aletheia map` below). Its size depends on the project: none under 25 source files, then 300 or 600 tokens. `--map-budget N` sets it by hand, and `0` turns it off.
-- **When the agent stops**, Aletheia reads the session transcript and records which files the task changed, as a map memory with `exists:` anchors. Nothing is generated and the agent spends no turn on it. A later map of the same kind of change (same folders and kinds of files) replaces the earlier one, and memories written by an agent or a person are never replaced.
+Edit memories by hand, review them in pull requests, grep them. They are just files.
 </details>
 
 <details>
-<summary><b>Claude Desktop</b> (<code>claude_desktop_config.json</code>)</summary>
-
-```json
-{
-  "mcpServers": {
-    "aletheia": {
-      "command": "aletheia",
-      "args": ["serve", "--dir", "/absolute/path/to/your-project"]
-    }
-  }
-}
-```
-</details>
-
-<details>
-<summary><b>VS Code</b> (<code>.vscode/mcp.json</code>)</summary>
-
-```json
-{
-  "servers": {
-    "aletheia": {
-      "command": "aletheia",
-      "args": ["serve", "--dir", "${workspaceFolder}"]
-    }
-  }
-}
-```
-</details>
-
-<details>
-<summary><b>Cursor, Cline, Windsurf and other MCP clients</b></summary>
-
-```json
-{
-  "mcpServers": {
-    "aletheia": {
-      "command": "aletheia",
-      "args": ["serve", "--dir", "/absolute/path/to/your-project"]
-    }
-  }
-}
-```
-</details>
-
-<details>
-<summary><b>Any agent without MCP</b> (Codex, Aider, custom agents)</summary>
-
-Run `aletheia init --agents`. It appends a short block to `CLAUDE.md` and `AGENTS.md` that teaches the agent to call `aletheia recall` and `aletheia remember` from the shell. Add `--json` to any read command for machine-readable output.
-</details>
-
-The MCP server exposes four tools: `recall`, `remember`, `get`, `verify`.
-
-## Anchors
-
-| Anchor | Holds while | Example |
-|---|---|---|
-| `file:PATH` | the file's content is unchanged (hash sealed when saved) | `file:go.mod` |
-| `contains:PATH::REGEX` | the file still matches the regular expression | `contains:go.mod::^go 1\.23$` |
-| `exists:PATH` | the path still exists | `exists:src/auth` |
-| `symbol:PATH::NAME` | the file still declares that function, method (`Type.Method`), type, var or const | `symbol:store.go::Store.Get` |
-
-- Use `symbol` for claims about one declaration, `contains` for claims about *one thing* in a file, and `file` when any change should trigger a re-check.
-- Recall shows where `symbol` and `contains` evidence is right now, e.g. `(store.go:15-21)`, so the agent reads those lines instead of the whole file. Line numbers are computed on every recall, so they never go stale. Go declarations are parsed with `go/parser` and get their full line range; other languages are matched by a declaration keyword and get one line.
-- In a `contains` pattern, a run of spaces or tabs matches any run of spaces or tabs, so reformatting (gofmt, prettier) does not stale it.
-- Files and directories named in a claim ("register in `builtin/registry.go`") get an `exists:` anchor automatically when they exist. Renaming them stales the memory even if no other anchor points there.
-- Anchor the code that does the thing, not a comment about it. `remember` warns when a `contains` anchor only matches comments, since a comment can stay while the code changes.
-- Add `--ttl 30d` for facts that age on their own ("staging is being migrated this week").
-- A memory with no anchors is allowed. It comes back as `[?]`, a hint ranked below verified facts. Nothing can mark it stale, so it expires after 90 days unless you set `--ttl` or re-confirm it with `verify --reseal`.
-
-When a memory goes stale, the agent re-checks the claim and then either:
-
-```bash
-aletheia verify 3f9a1c --reseal            # still true: refresh the hashes
-aletheia remember "…new claim…" --anchor … --supersedes 3f9a1c   # changed: replace it
-```
-
-`--reseal` refuses if a `contains` or `exists` anchor no longer holds, so a false claim cannot be quietly blessed.
-
-## Code map
-
-`aletheia map "<topic>"` lists the files most relevant to a topic, each with its key declarations and their current lines:
-
-```
-optimizer/fold.go: fold.Visit 15-311, fold 10-13, toFloat 329-335
-builtin/builtin.go: Builtins 35-1081, Index 18
-```
-
-It is built from the files on every call, so it cannot go stale.
-- Go is parsed with `go/parser`; other languages are scanned for declaration keywords.
-- Files are ranked first, as in Aider's repo map, by how well their path and declaration names match the topic. Declarations come next, with the ones named in the topic first.
-- It skips hidden, dependency and generated files.
-
-The hook sends a map once per session, so even an agent with an empty memory starts at the right files.
-
-## Token economy
-
-Memory should save tokens, not spend them. Aletheia is built around that:
-
-| Where tokens go | What Aletheia does |
-|---|---|
-| Re-discovering the codebase every session | A verified one-liner replaces a round of grepping and reading files |
-| Outdated facts that send the agent down the wrong path | Stale memories are hidden; only a one-line note says they exist |
-| Large recall dumps | `recall` returns one line per memory and packs results into a `--budget` (default ~600 tokens) |
-| Repeating the same memories in one conversation | `--session ID` skips memories already sent in that session |
-| LLM calls to extract and consolidate memories | None. Writing and checking are mechanical |
-| Tool schemas sent on every turn | Four small tools, about 400 tokens in total (a test keeps it under 600) |
-
-These are design properties, not benchmark results yet. A benchmark harness comparing *no memory*, *naive memory* and *Aletheia* on token use and task success is on the [roadmap](#roadmap).
-
-## Safety
-
-- **Never executes anything.** Anchors only read files; there is no "run this command to verify" anchor.
-- **Stays inside the project.** Anchor paths are relative and cannot escape the root, including through symlinks.
-- **Memories are data, not instructions.** The MCP server tells agents so, and the `CLAUDE.md` / `AGENTS.md` block repeats it.
-- **No network, no telemetry, no dependencies.** A single static binary using only the Go standard library.
-
-## CLI reference
+<summary><b>CLI</b></summary>
 
 ```text
 aletheia init [dir] [--agents]
@@ -245,25 +174,34 @@ aletheia remember <claim> [--anchor SPEC]... [--body TEXT|-] [--tag T]... [--ttl
 aletheia recall [query] [--budget N] [--limit N] [--full] [--stale] [--tag T] [--session ID] [--json]
 aletheia get <id> [--json]
 aletheia verify [id] [--reseal] [--ttl 30d] [--json]   # exits 1 if anything is stale (CI-friendly)
+aletheia map [topic] [--budget 600]
+aletheia hook [--budget N] [--map-budget N]              # Claude Code UserPromptSubmit and Stop hook
 aletheia lethe [--days 30] [--apply]                     # archive superseded and long-stale memories
 aletheia stats [--json]
 aletheia serve [--dir DIR]                               # MCP server on stdio
-aletheia map [topic] [--budget 600]                      # where relevant declarations are
-aletheia hook [--budget N] [--map-budget N]              # Claude Code UserPromptSubmit / Stop hook
 ```
 
 `remember` exits with code `3` when the claim duplicates or closely matches an existing memory, and names it so the agent can `--supersedes` it instead.
+</details>
+
+<details>
+<summary><b>Safety</b></summary>
+
+- **Never executes anything.** Anchors only read files; there is no "run this command to verify" anchor.
+- **Stays inside the project.** Anchor paths are relative and cannot escape the root, including through symlinks.
+- **Memories are data, not instructions.** The MCP server tells agents so, and the `CLAUDE.md` / `AGENTS.md` block repeats it.
+- **No network, no telemetry, no dependencies.** A single static binary using only the Go standard library.
+</details>
 
 ## Roadmap
 
-- [x] Evidence-anchored memories with freshness on every recall
-- [x] Token-budgeted recall, session de-duplication, conflict detection on write
-- [x] MCP server and CLI, zero dependencies
-- [ ] Git-aware anchors (`symbol:` for functions and types, follow renames)
-- [ ] Benchmark harness: tokens per task and success rate vs. no memory and naive memory
-- [ ] Optional semantic search (local embeddings) alongside BM25
-- [ ] Global, cross-project memory for personal preferences
+- [x] Evidence-anchored memories, checked on every recall
+- [x] Recall hook, live line pointers, code map, task maps from the Stop hook
+- [x] Benchmark harness with paired runs on real repositories
+- [ ] Longer benchmarks with more repositories and repeated kinds of change
+- [ ] Follow file renames with git and suggest re-anchoring
 - [ ] Prebuilt binaries, Homebrew, Scoop and an `npx` wrapper
+- [ ] Global, cross-project memory for personal preferences
 
 ## Contributing
 
@@ -273,7 +211,4 @@ Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 [Apache-2.0](LICENSE) © Fırat Tuna Arslan
 
-<p align="center">
-  <img src="assets/owl.svg" alt="" width="72"><br>
-  <sub><i>a·lḗtheia: truth, literally “un-forgetting”</i></sub>
-</p>
+<p align="center"><sub><i>ἀ-λήθεια: truth, literally "un-forgetting"</i></sub></p>
