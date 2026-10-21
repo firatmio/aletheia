@@ -304,3 +304,29 @@ Branch `feat/hook-and-pointers`:
 - The first task of each kind pays for writing the memories.
 - Over a 4-task sequence with one repeat (T2) plus one trap repeat (T3), that nets out to break-even.
 - The saving should grow with the number of repeats per kind. The next benchmark needs sequences with ≥3 tasks of the same kind, and ≥2 replicates.
+
+### R3-map: hook + pointers + code map (1 replicate, `mem-5`, branch `feat/structure-map`)
+The hook now also sends a ~300-token code map on the first prompt of each session. Same R3 sequence; all 4 sessions passed the full suite and the acceptance tests.
+
+| Task | mem-5 (code map) | ctrl-1 / ctrl-2 | mem-4 (hook, no map) | mem-3 | mem-1/2 (old) |
+|---|---|---|---|---|---|
+| T1 clamp (empty memory) | **$0.45** | $0.60 / $0.46 | $0.66 | $0.53 | $0.71 |
+| T2 sign | **$0.37** | $0.46 / $0.48 | $0.38 | $0.28 | $0.40 |
+| T3 lerp (after the rename) | **$0.38** | $0.39 / $0.48 | $0.36 | $0.37 | $0.49 |
+| T4 fold clamp | **$0.34** | $0.40 / $0.35 | $0.43 | $0.65 | $0.39 |
+| **Total** | **$1.54** | $1.85 / $1.77 | $1.83 | $1.83 | $1.98 |
+
+- **For the first time the whole sequence is cheaper than control: −15% against the control mean.** Every task came in below *both* control replicates. That was never true before: T1 and T4, the first task of a new kind, always ate the savings.
+- **T1 (empty memory):**
+  - 6 calls before the first edit (control 14), and 13k chars read before it (control 32k).
+  - The agent started with a grep for the builtin names and went straight to the docs section and the test file the map pointed at.
+- **T4 (new kind of change):**
+  - The first call was `Read optimizer/fold.go`, the file the map put at the top.
+  - 4 calls before the first edit (control 8), 12 turns.
+- **T2/T3** stayed in the range of the earlier memory runs (−12% to −21% against control).
+- The hook sent the map in all 4 sessions (`.map` markers exist), and recall memories in T2–T4.
+
+**Caveats:**
+- n=1. Earlier runs showed ±$0.15 per task between runs with nothing changed. All four tasks landing below both control runs is a consistent signal, not proof.
+- Next: 2–3 more replicates of mem-5, plus one control replicate run at the same time to rule out drift over time.
+- Then a longer sequence with more repeats.

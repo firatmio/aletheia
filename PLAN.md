@@ -158,6 +158,7 @@ Aletheia has no claim yet. The goal is to **save tokens without losing quality**
 **v0.3: prove the token claim** (important for launch credibility)
 - First run (R3, 2026-10-21, `docs/dogfood-4.2.md` §8): on expr-lang/expr, 4 tasks × 2 reps, Aletheia was **not cheaper** (+9% cost, +20% input tokens, same turns, 16/16 success both arms). Stale handling worked. Agents save gotchas, not navigation; next try navigation memories and mistake-avoidance tasks.
 - R3-nav (map-memory rule, PR #3, 1 rep): break-even overall; the next same-kind task was 40% cheaper; no effect on a new kind of change. Follow-up plan: 4.5.
+- R3-hook (PR #4) and R3-map (`feat/structure-map`, 1 rep each): the hook plus live pointers alone still broke even. With the code map added, the whole sequence was **15% cheaper than control**, every task below both control runs, 4/4 success. Next: replicate before any README number.
 - Benchmark harness: run the same coding tasks with (a) no memory, (b) naive append-only memory, (c) Aletheia; measure input tokens per task and task success. Include a "stale trap" scenario (a fact changes mid-run). Publish method and numbers in the README; no numbers before this exists.
 
 **v0.4: reach**
