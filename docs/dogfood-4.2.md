@@ -170,3 +170,28 @@ Same two tasks, run twice: R1v2-i (DELETE task from the pre-R1 commit), then R2v
   - Claims are sometimes a little broader than their anchor (status codes mentioned but not anchored).
   - Exploration in this toy repo is still "cat everything", so the token claim still needs a bigger repo.
   - Harness noise: one denied `python -` heredoc per R2 run.
+
+## 7. Engine fixes, measured (branch `feat/anchor-robustness`)
+
+Three changes from section 5:
+1. **Whitespace-tolerant `contains:`.** A run of spaces/tabs in the pattern matches any run of spaces/tabs. Escaped spaces, spaces inside character classes and quantified spaces keep their meaning.
+2. **Comment-only warning.** `remember` adds a note when a `contains:` anchor matches only inside comments. This is a heuristic per language extension; unknown languages are never flagged.
+3. **Default TTL for unanchored memories.** They expire after 90 days unless `--ttl` is given. `verify --reseal` without a ttl renews them for another 90 days.
+
+The section 2 edit experiment was re-run on the same tree (commit `87e114d`, the 25 dogfood memories) with the old and new binaries:
+
+| Outcome | Old | New |
+|---|---|---|
+| caught | 7 | 7 |
+| NEEDLESS_STALE | 6 | **4** (gofmt realignment no longer stales: H2, H3) |
+| FALSE_OK at verify time | 4 | 4 (unchanged: the fix acts at write time) |
+| …of which flagged when saved | 0 | **2** (S5 "never executes" doc comment, S6 "(default 30)" field comment); no false warnings on the other 23 memories |
+| SILENT_HINT | 3 | 3 today, but all 6 unanchored memories now expire after ≤90 days instead of never |
+
+Still not covered:
+- S3 (a function name that still appears elsewhere) and S8 (an unused constant): these need `symbol:` anchors or usage-aware checks.
+- H1 (`file:` on any edit), H4 (reordered literal), H6 (a list grew) and H7 (an anchored comment was reworded; the new warning now discourages that anchor).
+
+A real stale event happened along the way. PR #1 changed `installAgents`:
+- Memory `673a56` ("init --agents appends … to AGENTS.md") went stale, which is correct.
+- Memory `ddeb31` ("init --agents alone does not reach Claude Code") silently became false. It is unanchored, so only the new TTL would ever retire it.

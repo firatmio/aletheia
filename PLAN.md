@@ -110,6 +110,7 @@ Status 2026-10-21 (first pass, details in `docs/dogfood-4.2.md`):
 - Edit experiment (21 edits): 7/14 false claims caught; **4 false `[ok]`**, all from proxy anchors; 3 silent `[?]`; **6/7 harmless edits staled a true memory**.
 - Recall: top-1 relevant on 4/8 natural questions.
 - Still open: watch a real Claude Code session use the MCP tools (needs a new session); run `aletheia verify` weekly and log real stale / false `[ok]` cases; decide on the fixes in section 5 of the log.
+- Lab runs with a headless Claude Code agent (section 6 of the log) led to PR #1 (`init --agents` writes CLAUDE.md, anchor rules in the snippet). Engine fixes (section 7): whitespace-tolerant `contains:`, comment-only anchor warning, 90-day default TTL for unanchored memories; needless stales in the experiment went from 6 to 4, and 2 of 4 false `[ok]` are now flagged when saved.
 
 ### 4.3 First release
 - Run `goreleaser check` and `goreleaser release --snapshot --clean` locally.
