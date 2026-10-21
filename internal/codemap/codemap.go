@@ -45,6 +45,21 @@ type Symbol struct {
 // Map is the set of declarations in a project.
 type Map struct {
 	Symbols []Symbol
+	Files   int // source files scanned
+}
+
+// SuggestedBudget sizes a map to the project: a small project gets none,
+// since an agent reads all of it in a few calls anyway, and the budget grows
+// with the number of source files.
+func (m *Map) SuggestedBudget() int {
+	switch {
+	case m.Files < 25:
+		return 0
+	case m.Files < 150:
+		return 300
+	default:
+		return 600
+	}
 }
 
 var skipDirs = map[string]bool{
@@ -112,6 +127,7 @@ func Build(root string) (*Map, error) {
 		}
 		return nil
 	})
+	m.Files = files
 	for i := range m.Symbols {
 		s := &m.Symbols[i]
 		name := s.Name

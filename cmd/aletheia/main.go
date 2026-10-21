@@ -49,7 +49,7 @@ Usage:
   aletheia serve [--dir DIR]          MCP server on stdio
   aletheia map [topic] [--budget N]   where relevant declarations are (file: Name lines)
   aletheia hook [--budget N] [--map-budget N]
-                                      Claude Code UserPromptSubmit hook (JSON on stdin)
+                                      Claude Code UserPromptSubmit and Stop hook (JSON on stdin)
   aletheia version
 
 Anchors (evidence a memory is checked against, relative to the project root):
@@ -410,14 +410,16 @@ func (c *cli) hook(args []string) int {
 	if err != nil {
 		return c.usageErr(err)
 	}
-	mapBudget, err := f.intv("map-budget", 300)
+	mapBudget, err := f.intv("map-budget", -1) // -1: sized to the project
 	if err != nil {
 		return c.usageErr(err)
 	}
 	var in struct {
-		Prompt    string `json:"prompt"`
-		SessionID string `json:"session_id"`
-		Cwd       string `json:"cwd"`
+		Event          string `json:"hook_event_name"`
+		Prompt         string `json:"prompt"`
+		SessionID      string `json:"session_id"`
+		Cwd            string `json:"cwd"`
+		TranscriptPath string `json:"transcript_path"`
 	}
 	if err := json.NewDecoder(io.LimitReader(c.in, 1<<20)).Decode(&in); err != nil {
 		return exitOK
@@ -429,6 +431,10 @@ func (c *cli) hook(args []string) int {
 	if err != nil {
 		return exitOK
 	}
+	if in.Event == "Stop" {
+		captureStop(e, in.SessionID, in.TranscriptPath)
+		return exitOK // Stop output would reach the agent; it gets none
+	}
 	res, err := e.Recall(engine.RecallOptions{Query: in.Prompt, Budget: budget, Limit: limit, Session: in.SessionID})
 	if err != nil {
 		res, err = e.Recall(engine.RecallOptions{Query: in.Prompt, Budget: budget, Limit: limit}) // odd session id
@@ -437,9 +443,12 @@ func (c *cli) hook(args []string) int {
 	if err == nil && (len(res.Hits) > 0 || len(res.HiddenStale) > 0) {
 		parts = append(parts, hookPreamble+res.Text())
 	}
-	if mapBudget > 0 && firstInSession(e.Store, in.SessionID, "map") {
+	if mapBudget != 0 && firstInSession(e.Store, in.SessionID, "map") {
 		if m, err := codemap.Build(e.Store.Root); err == nil {
-			if s := m.Render(in.Prompt, mapBudget); s != "" {
+			if mapBudget < 0 {
+				mapBudget = m.SuggestedBudget()
+			}
+			if s := m.Render(in.Prompt, mapBudget); mapBudget > 0 && s != "" {
 				parts = append(parts, mapPreamble+s)
 			}
 		}

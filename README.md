@@ -103,15 +103,20 @@ aletheia init --agents
 
 Claude Code loads MCP tools on demand, so their descriptions rarely reach the model. The `CLAUDE.md` block written by `init --agents` is what makes it recall before exploring.
 
-To recall automatically on every prompt, add this hook to `.claude/settings.json`. Recall then costs the agent no tool call, and each memory is sent once per session. The first prompt of a session also gets a short code map (see `aletheia map` below; `--map-budget 0` turns it off):
+For the cheapest setup, add these hooks to `.claude/settings.json`:
 
 ```json
 {
   "hooks": {
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "aletheia hook" }] }]
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "aletheia hook" }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "aletheia hook" }] }]
   }
 }
 ```
+
+- **On every prompt**, Aletheia recalls for you. The agent spends no tool call on it, and each memory is sent once per session.
+- **On the first prompt of a session**, the agent also gets a code map (see `aletheia map` below). Its size depends on the project: none under 25 source files, then 300 or 600 tokens. `--map-budget N` sets it by hand, and `0` turns it off.
+- **When the agent stops**, Aletheia reads the session transcript and records which files the task changed, as a map memory with `exists:` anchors. Nothing is generated and the agent spends no turn on it. A later map of the same kind of change (same folders and kinds of files) replaces the earlier one, and memories written by an agent or a person are never replaced.
 </details>
 
 <details>
@@ -244,7 +249,7 @@ aletheia lethe [--days 30] [--apply]                     # archive superseded an
 aletheia stats [--json]
 aletheia serve [--dir DIR]                               # MCP server on stdio
 aletheia map [topic] [--budget 600]                      # where relevant declarations are
-aletheia hook [--budget N] [--map-budget N]              # Claude Code UserPromptSubmit hook
+aletheia hook [--budget N] [--map-budget N]              # Claude Code UserPromptSubmit / Stop hook
 ```
 
 `remember` exits with code `3` when the claim duplicates or closely matches an existing memory, and names it so the agent can `--supersedes` it instead.
