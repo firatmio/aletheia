@@ -353,3 +353,37 @@ The hook now also sends a ~300-token code map on the first prompt of each sessio
   - a longer sequence (more same-kind repeats, where the memory part should add up);
   - a second repo;
   - consider sending the map without waiting for recall hits.
+
+## 9. R4 (lean): go-chi/chi @9f8adb1, paired design, 14 sessions
+Setup (`lab-runs/r4/`):
+- **Tasks:** seven tasks in a row:
+  - middleware ×5: `RequireHeader`, `NoIndex`, `MaxURLLength`, `CanonicalHost`, `ServerTiming`;
+  - URL-param helpers ×2: `URLParamInt`, `URLParamBool`;
+  - **trap** before T5: the middleware test helpers move from `middleware_test.go` to `helpers_test.go`.
+- **Paired control:** before every task the control copy is reset to the memory copy's code, minus Aletheia's files. Each task is then a clean A/B from the same starting point.
+- **Arms:** the memory arm has the hook, the code map and MCP. One replicate, Opus 5.5. 14/14 sessions passed the full suite and the acceptance tests.
+
+| Task | Mem | Ctrl | Turns mem/ctrl | Chars read before first edit mem/ctrl |
+|---|---|---|---|---|
+| T1 RequireHeader | $0.33 | $0.29 | 11/10 | 9k/15k |
+| T2 NoIndex | $0.24 | $0.29 | 11/10 | 10k/10k |
+| T3 URLParamInt | $0.33 | $0.32 | 16/13 | 3k/11k |
+| T4 MaxURLLength | $0.27 | $0.26 | 12/10 | 9k/13k |
+| T5 CanonicalHost (after the trap) | $0.37 | $0.30 | 11/9 | 13k/16k |
+| T6 URLParamBool | $0.23 | $0.22 | 9/10 | 4k/6k |
+| T7 ServerTiming | $0.47 | $0.46 | 14/13 | 27k/27k |
+| **Total** | **$2.24** | **$2.14** | 84/75 | |
+
+**Verdict: no saving on chi; about +5% overhead.**
+- The memory arm still read less before its first edit (5 of 7 tasks, e.g. T3 3k vs 11k).
+- But chi tasks are small. Control solves each one in about 10 turns from roughly 10–15k chars, inside a single, well-named `middleware/` folder. There is little exploration left to save.
+- What remains is Aletheia's own cost: recall/remember and the map memory at the end of each task added 9 turns over the sequence (84 vs 75).
+
+**Reading R3 and R4 together:**
+- **Where Aletheia pays:** mid-size code where finding the right place is expensive. On expr, the sequence was 12% cheaper, and T1 read 60% less before its first edit.
+- **Where it costs:** small, well-organized code where the agent finds everything in one or two reads (+5% on chi). The write side (extra remember turns) is the main overhead.
+
+**What this suggests:**
+1. Make writing cheaper: several memories in one call (e.g. `remember` taking JSON lines on stdin), so the end-of-task save is one turn instead of 2–3.
+2. Write only when it pays. Skip the map memory when the change touched one small, obvious area. Possibly let the snippet say "save a map only if finding the place took more than a couple of searches".
+3. Position honestly: for mid-size and larger codebases, not for small packages.
