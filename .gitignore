@@ -1,0 +1,17 @@
+# Build output
+/aletheia
+/aletheia.exe
+/dist/
+*.test
+*.out
+
+# Machine-local Aletheia state (sessions); memories themselves are meant to be committed
+.aletheia/.state/
+
+# Editors and OS
+.serena/
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
