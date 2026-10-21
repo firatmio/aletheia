@@ -87,3 +87,86 @@ The same agent wrote the anchors and designed the edits, so these numbers show *
    - reconsider the 0.7 factor for `[?]` when the relevance gap is large.
 5. **AGENTS.md / CLAUDE.md:** have `init --agents` also handle CLAUDE.md, or print the one line to add.
 6. The `symbol:` anchor on the roadmap would turn most proxy anchors on names into strong ones.
+
+## 6. Lab runs: a real Claude Code agent (headless)
+
+Setup:
+- Lab repo `C:\source\aletheia-lab` ("shorty", a URL shortener using only the Go standard library, with a decisions doc).
+- `claude -p` (Claude Code 2.1.168, Opus 5.5) runs in a clean environment. Aletheia is connected through `--mcp-config` and `--strict-mcp-config`.
+- Prompts never mention Aletheia. Logs are in `lab-runs/` (git-excluded).
+
+### R1: empty memory, `AGENTS.md` only, task "add DELETE /api/links/{code} with tests"
+- MCP was connected and all 4 tools were listed. **0 recall, 0 remember.** The task succeeded in 14 turns, 42 s, about $0.23.
+- The agent **did read `AGENTS.md`**, but only because it showed up in a `Glob **/*`. That was the 5th call, after it had already read three source files. It then ignored both instructions ("recall before exploring", "remember durable facts").
+- Likely reason the MCP descriptions had no effect: the session has `ToolSearch`. In that mode Claude Code defers MCP tools and the model sees only their **names**, not the descriptions. "Search project memory before exploring the codebase" probably never reached the model. R1c below confirms it.
+- Claude Code has its own **auto-memory** directory (`~/.claude/projects/<proj>/memory/`). It stayed empty here, but it is the built-in competitor Aletheia must coexist with.
+- Harness noise: 2 turns were lost to denied `PowerShell` calls (not in `--allowedTools`).
+
+### R1b (snippet in `CLAUDE.md`) and R1c (`AGENTS.md` only, `ENABLE_TOOL_SEARCH=false`)
+Same task and the same pre-R1 commit for both.
+
+| Run | Instructions reach the model through | First call | remember | Turns | Cache create / read | Cost |
+|---|---|---|---|---|---|---|
+| R1 | `AGENTS.md` (only found by Glob) | Glob | 0 | 14 | 17.9k / 185k | $0.23 |
+| R1b | `CLAUDE.md` (auto-loaded) | `aletheia recall` **via Bash CLI** | 1 (CLI) | 13 | 17.3k / 132k | $0.22 |
+| R1c | MCP descriptions (tool search off) | `mcp__aletheia__recall` | 1 (MCP) | 13 | 44.8k / 205k | $0.46 |
+
+- **Where the instructions live decides everything.**
+  - `CLAUDE.md` works.
+  - MCP descriptions work only when tool search is off. That doubled the session cost, almost entirely because every *other* deferred tool got loaded, not because of Aletheia.
+  - `AGENTS.md` alone does nothing for Claude Code.
+  - → `init --agents` must write to `CLAUDE.md` (or both files).
+- With `CLAUDE.md`, the agent used the **CLI through Bash**, not the MCP tools, even though MCP was connected. The snippet names the CLI first, and the MCP tools were deferred.
+- Both runs recalled first; the store was empty, so there was nothing to gain yet. Both remembered **exactly one** memory, at the very end, and in both cases it was the security note from the agent's final answer.
+- The memories reproduce the failure modes predicted in sections 2 and 5, this time from a real agent:
+  - R1b: "API routes have no authentication…" anchored by `file:handlers.go` (the busiest file, so the next edit stales it) and by `contains:handlers.go::DELETE /api/links/\{code\}` (a proxy). If auth is added and the route string stays, the claim becomes false but still shows `[ok]`.
+  - R1c: one memory holding three claims (route style, store flushing, no auth), anchored by two proxies (the DELETE route string and the `Store.Delete` signature). None of the anchors evidences any of the three claims.
+- Takeaways for the snippet and tool descriptions:
+  - one fact per memory;
+  - anchor the line that *proves* the claim;
+  - do not use `file:` on busy files;
+  - "absence" claims (no auth, no lock) get no anchor and a TTL instead.
+
+### R2: does recalled memory shorten exploration?
+- **Setup:** CLAUDE.md, starting from the end of R1b.
+- **Task:** "protect DELETE with `SHORTY_ADMIN_TOKEN` (401/403) + tests".
+- **Runs:** two with R1b's single memory (`mem`), two with the memory removed (`ctrl`).
+
+| Run | Recall at start | Exploration | Turns | Cache read | Cost |
+|---|---|---|---|---|---|
+| mem-1 | `8360ca [ok] …no authentication…` | cat config/handlers/main/AGENTS/decisions + tests, README | 19 | 318k | $0.39 |
+| mem-2 | same | same | 17 | 282k | $0.33 |
+| ctrl-1 | none | same | 16 | 253k | $0.33 |
+| ctrl-2 | none | same | 19 | 296k | $0.41 |
+
+- **No measurable saving.** The averages are 18 turns / $0.36 with memory and 17.5 turns / $0.37 without, which is within run-to-run noise.
+  - The exploration was identical: every run `cat`s the whole repo in one or two calls. In a 6-file repo, reading everything costs less than trusting a memory.
+  - The one recalled memory (a security note) is not navigation knowledge, so it could not replace any read.
+  - **The token claim cannot be tested on a toy repo.** It needs a repo where exploration is expensive.
+- **The stale trap was handled well, by the agent rather than by the anchors.** Both `mem` runs saw `[ok] …no authentication…` and, after adding auth, wrote a new memory with `--supersedes 8360ca`. The supersede workflow in the snippet is understood and used.
+- **Memory quality repeats R1b's problems:**
+  - **All 4 runs anchored `file:handlers.go`.** That is the busiest file, so the next edit stales the memory. This is systematic, not a one-off.
+  - The claims are compound again. Two of them carry an "other routes are unauthenticated" absence claim that no anchor can evidence.
+- Harness noise, equal across groups:
+  - With `core.autocrlf=true`, branch checkouts gave CRLF files, so `gofmt -l` flagged every file and agents spent 2–3 turns on it. Fixed by setting `core.autocrlf=false` in the lab repo.
+  - `python -` heredocs were denied, and the agents fell back to Edit.
+
+### v2: after the fix (`init --agents` writes CLAUDE.md + AGENTS.md; anchor rules in the snippet and the `remember` description)
+Same two tasks, run twice: R1v2-i (DELETE task from the pre-R1 commit), then R2v2-i (admin-token task on top of it).
+
+| | Before (R1b, R1c, 4×R2) | After (2×R1v2, 2×R2v2) |
+|---|---|---|
+| Sessions that recalled first | 6/6 | 4/4 |
+| Memories written | 6 (1 per session) | 11 (2–3 per session) |
+| Compound claims | 6/6 | 0/11 (some still state slightly more than the anchor shows, e.g. "routed to `remove`, **returns 204/404**") |
+| `file:` anchors | 5/6 | **0/11** |
+| Absence claims ("no auth") | anchored with proxies (false-`[ok]` risk) | 3, all **unanchored with `--ttl 30d`** |
+| Anchors on the proving line | 0 | 5 strong (e.g. the `subtle.ConstantTimeCompare(...)` line, the `AdminToken == ""` check), 3 partial |
+| Old "no auth" memory superseded after adding auth | 2/2 | 2/2 |
+| Cost per session | R1 ≈ $0.22, R2 ≈ $0.36 | R1 ≈ $0.22, R2 ≈ $0.32 |
+
+- The rules in the snippet changed the agents' behaviour right away: one fact per memory, no `file:`, absence claims put on TTL.
+- What is still open:
+  - Claims are sometimes a little broader than their anchor (status codes mentioned but not anchored).
+  - Exploration in this toy repo is still "cat everything", so the token claim still needs a bigger repo.
+  - Harness noise: one denied `python -` heredoc per R2 run.
