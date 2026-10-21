@@ -195,3 +195,86 @@ Still not covered:
 A real stale event happened along the way. PR #1 changed `installAgents`:
 - Memory `673a56` ("init --agents appends … to AGENTS.md") went stale, which is correct.
 - Memory `ddeb31` ("init --agents alone does not reach Claude Code") silently became false. It is unanchored, so only the new TTL would ever retire it.
+
+## 8. R3: expr-lang/expr @4b31df3, Aletheia vs no Aletheia
+
+Setup:
+- **Repo:** expr-lang/expr (102 non-test Go files, zero dependencies).
+- **Tasks:** four tasks in a row, each in a fresh headless Claude Code session (Opus 5.5, default effort):
+  - T1: `clamp` builtin;
+  - T2: `sign` builtin;
+  - **trap**: `builtin/builtin.go` renamed to `registry.go`;
+  - T3: `lerp` builtin;
+  - T4: fold constant `clamp` calls in the optimizer.
+- **Arms:**
+  - `mem`: Aletheia via `init --agents` (CLAUDE.md) plus MCP;
+  - `ctrl`: no Aletheia, only Claude Code's own auto-memory.
+- **Scale:** 2 replicates each, 16 sessions in total.
+- **Success check:** `go test ./...` plus hidden acceptance tests after every session.
+- `ctrl-1-T4` was cut off by the usage limit and re-run from the post-T3 state; the aborted run is kept as `aborted-*`.
+- Scripts: `lab-runs/r3/`.
+
+**Success:** 16/16 sessions passed the full suite and the acceptance tests, in both arms.
+
+| Task | Turns mem/ctrl | Cost mem/ctrl | Input tokens mem/ctrl | Calls before first edit mem/ctrl |
+|---|---|---|---|---|
+| T1 (empty memory) | 32/28 | $0.71/$0.53 | 847k/505k | 12/14 |
+| T2 | 20/24 | **$0.40/$0.47** | 384k/466k | 9/8 |
+| T3 (after the trap) | 25/26 | $0.49/$0.43 | 458k/452k | 11/11 |
+| T4 | 14/16 | $0.39/$0.38 | 383k/302k | 6/8 |
+| **Total (8 sessions/arm)** | 184/188 | **$3.96/$3.63** | **4.14M/3.45M** | |
+
+**Verdict: no token saving.**
+- On this repo and task sequence, Aletheia cost **about 9% more and read about 20% more input tokens**, with the same number of turns and the same success rate.
+- Only T2 was cheaper with memory, in both replicates (about −15%).
+- T1 pays for recall/remember while the memory is still empty.
+- T3 pays for handling the stale memories.
+
+**Why:**
+- **The agents wrote "gotcha" memories, not a map.** Examples:
+  - "`TestBuiltin_works_with_any` needs new multi-arg builtins in its config map";
+  - "`sign` type-checks to int";
+  - "go 1.18, so no `min`/`max`".
+- None of them said "builtins live in X, docs go under Y, tests follow pattern Z". So every session still grepped for `abs`/`max` to find the pattern. The snippet asks for durable facts; agents pick the non-obvious ones, and the cheap-to-rediscover structure never gets saved.
+- **The memory store stayed tiny** (4–5 active memories), so there was little that recall could replace.
+
+**What worked:**
+- **The stale trap was handled correctly in 2/2 replicates.**
+  - Recall hid the stale memory ("+1 stale hidden").
+  - The agent ran `aletheia get` on it, re-located the code in `registry.go`, and wrote a re-anchored replacement with `--supersedes`.
+  - No agent acted on the outdated location.
+- Memory quality held up:
+  - one fact each;
+  - anchors on the proving line (e.g. `case "clamp":` in `fold.go`);
+  - no `file:` anchors.
+
+**Caveats:**
+- n=2 per cell, so differences of ±15% are within noise. Only the direction of the total (memory is not cheaper here) is reasonably clear.
+- Four related tasks is a short horizon, and the repo is mid-size.
+
+**Implications for the token claim** (do not put a "saves tokens" number in the README):
+1. Test whether **navigation memories** pay off: ask agents to save one "where things live / how a change of this kind is done" memory per task, then re-run R3.
+2. Measure **mistakes avoided** rather than tokens, with tasks where a gotcha bites. Here every session succeeded either way.
+3. Longer task sequences and larger repos, where rediscovery costs more.
+
+### R3-nav: the same sequence with a "map memory" rule (1 replicate, `mem-3`)
+The snippet gained one rule: when a task is finished, save one map memory saying where this kind of change is made and in which steps, anchored with `exists:` on each file it names. Only the memory arm was re-run; it is compared against the two existing control replicates.
+
+| Task | mem-3 | ctrl (mean of 2) | mem-1/2 (mean, old snippet) | Chars read before first edit, mem-3 vs ctrl |
+|---|---|---|---|---|
+| T1 clamp (empty memory) | $0.53 | $0.53 | $0.71 | 26k vs 32k |
+| T2 sign (map available) | **$0.28** | $0.47 | $0.40 | **11k vs 30k** |
+| T3 lerp (map stale after the rename) | **$0.37** | $0.43 | $0.49 | 18k vs 29k |
+| T4 fold clamp (new kind of change, no map) | $0.65 | $0.38 | $0.39 | 32k vs 23k |
+| Total | $1.83 | $1.82 | $1.98 | |
+
+What happened:
+- **T1** wrote the map ("New builtin: register in the Builtins slice in `builtin/builtin.go`, runtime in `lib.go`, validator in `validation.go`, tests in `builtin_test.go` incl. the arity config, docs in `language-definition.md`, name in `test/fuzz/fuzz_expr.dict`"). The T1 overhead from earlier runs disappeared: $0.53, the same as control.
+- **T2** recalled the map and went straight to the right files. It read a third of what control read before its first edit and cost **about 40% less**. This is the first clear saving in any run.
+- **T3**: the rename trap staled the map, so it was hidden. The agent opened it with `get`, still used its steps, found `registry.go`, and superseded it with a corrected map. That is about 14% cheaper than control.
+- **T4** was a different kind of change, so there was no map for it. The agent first tried the wrong node type (`CallNode`), backtracked, and needed 29 turns. This looks like per-run variance, not a memory effect. At the end it saved a map for "compile-time folding of a builtin call", which would help the next folding task.
+
+Reading (n=1, suggestive only):
+- A map memory pays off when the **next task is the same kind of change** (−40% on T2). It does nothing for a new kind of change.
+- Over the whole sequence it broke even with control, where the old snippet was +9%. Excluding T4, T1–T3 cost $1.18 vs $1.43 for control (about −17%).
+- The value grows with how often the same kind of change repeats, which is common in real projects (new endpoint, new builtin, new migration). Next: a longer sequence with repeated change types and ≥2 replicates, before any README number.

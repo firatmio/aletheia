@@ -129,6 +129,7 @@ Status 2026-10-21 (first pass, details in `docs/dogfood-4.2.md`):
 - `aletheia doctor`: list memories whose `file:` anchors stale constantly and suggest `contains:`.
 
 **v0.3: prove the token claim** (important for launch credibility)
+- First run (R3, 2026-10-21, `docs/dogfood-4.2.md` §8): on expr-lang/expr, 4 tasks × 2 reps, Aletheia was **not cheaper** (+9% cost, +20% input tokens, same turns, 16/16 success both arms). Stale handling worked. Agents save gotchas, not navigation; next try navigation memories and mistake-avoidance tasks.
 - Benchmark harness: run the same coding tasks with (a) no memory, (b) naive append-only memory, (c) Aletheia; measure input tokens per task and task success. Include a "stale trap" scenario (a fact changes mid-run). Publish method and numbers in the README; no numbers before this exists.
 
 **v0.4: reach**
