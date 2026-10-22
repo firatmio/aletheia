@@ -6,7 +6,7 @@ import { agentsMd, llmsTxt } from "./src/agents";
 // src/content.ts: served by the dev server and emitted into dist on build.
 function agentFiles(): Plugin {
   const files: Record<string, { type: string; body: () => string }> = {
-    "agents.md": { type: "text/markdown; charset=utf-8", body: agentsMd },
+    "agents.md": { type: "text/plain; charset=utf-8", body: agentsMd },
     "llms.txt": { type: "text/plain; charset=utf-8", body: llmsTxt },
   };
   return {

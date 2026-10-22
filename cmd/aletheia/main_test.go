@@ -225,6 +225,114 @@ func TestInitAgentsKeepsExistingClaudeMD(t *testing.T) {
 	}
 }
 
+func TestInitClaudeHooksMergesAndIsIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, dir, ".claude/settings.json", `{"$schema": "https://json.schemastore.org/claude-code-settings.json",
+ "permissions": {"allow": ["Bash(go test:*)"]},
+ "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "lint-guard"}]}]}}`)
+
+	code, out, errs := runCLI(t, dir, "", "init", "--claude-hooks")
+	if code != 0 || !strings.Contains(out, "added the UserPromptSubmit and Stop hooks") {
+		t.Fatalf("init --claude-hooks: %d %q %q", code, out, errs)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, ".claude", "settings.json"))
+	var got struct {
+		Schema      string `json:"$schema"`
+		Permissions struct {
+			Allow []string `json:"allow"`
+		} `json:"permissions"`
+		Hooks map[string][]struct {
+			Matcher string `json:"matcher"`
+			Hooks   []struct {
+				Command string `json:"command"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("settings.json is no longer valid JSON: %v\n%s", err, data)
+	}
+	if got.Schema == "" || len(got.Permissions.Allow) != 1 || got.Hooks["PreToolUse"][0].Hooks[0].Command != "lint-guard" {
+		t.Fatalf("existing settings must be kept: %s", data)
+	}
+	for _, ev := range []string{"UserPromptSubmit", "Stop"} {
+		if g := got.Hooks[ev]; len(g) != 1 || g[0].Hooks[0].Command != "aletheia hook" {
+			t.Fatalf("%s hook missing: %s", ev, data)
+		}
+	}
+	if s := string(data); strings.Index(s, `"$schema"`) > strings.Index(s, `"permissions"`) {
+		t.Fatalf("key order must be kept: %s", s)
+	}
+
+	_, out, _ = runCLI(t, dir, "", "init", "--claude-hooks")
+	again, _ := os.ReadFile(filepath.Join(dir, ".claude", "settings.json"))
+	if !strings.Contains(out, "already has the Aletheia hooks") || string(again) != string(data) {
+		t.Fatalf("a second run must change nothing: %q\n%s", out, again)
+	}
+}
+
+func TestInitClaudeHooksRefusesBrokenSettings(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, dir, ".claude/settings.json", `{"hooks": `)
+	if code, _, errs := runCLI(t, dir, "", "init", "--claude-hooks"); code != exitFail || !strings.Contains(errs, "settings.json") {
+		t.Fatalf("broken settings must be reported, not overwritten: %d %q", code, errs)
+	}
+	if data, _ := os.ReadFile(filepath.Join(dir, ".claude", "settings.json")); string(data) != `{"hooks": ` {
+		t.Fatalf("broken settings were changed: %q", data)
+	}
+}
+
+func TestInitPrintsNextSteps(t *testing.T) {
+	dir := t.TempDir()
+	_, out, _ := runCLI(t, dir, "", "init")
+	if !strings.Contains(out, "next steps:") || !strings.Contains(out, "aletheia init --claude-hooks") ||
+		!strings.Contains(out, "hook --dry-run") {
+		t.Fatalf("init should say what is left: %q", out)
+	}
+	_, out, _ = runCLI(t, dir, "", "init", "--agents", "--claude-hooks")
+	if strings.Contains(out, "init --claude-hooks ") || strings.Contains(out, "init --agents ") {
+		t.Fatalf("steps already done should not be suggested: %q", out)
+	}
+}
+
+func TestEveryCommandHasHelp(t *testing.T) {
+	for _, cmd := range []string{"init", "remember", "recall", "get", "verify", "lethe", "stats", "serve", "map", "hook"} {
+		code, out, errs := runCLI(t, t.TempDir(), "", cmd, "--help")
+		if code != 0 || !strings.Contains(out, "aletheia "+cmd) || errs != "" {
+			t.Fatalf("%s --help: %d %q %q", cmd, code, out, errs)
+		}
+	}
+	if _, out, _ := runCLI(t, t.TempDir(), "", "hook", "-h"); !strings.Contains(out, `"hook_event_name": "UserPromptSubmit"`) {
+		t.Fatalf("hook help should document its stdin: %q", out)
+	}
+}
+
+func TestHookDryRunChangesNothing(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "go.mod", "module x\n\ngo 1.23\n")
+	runCLI(t, dir, "", "init")
+	runCLI(t, dir, "", "remember", "The module targets Go 1.23", "--anchor", `contains:go.mod::^go 1\.23$`)
+	before, _ := os.ReadDir(filepath.Join(dir, ".aletheia", ".state"))
+
+	for i := 0; i < 2; i++ {
+		code, out, _ := runCLI(t, dir, "", "hook", "--dry-run", "which go version does the module target")
+		if code != 0 || !strings.Contains(out, "[ok] The module targets Go 1.23") || strings.Contains(out, "hookSpecificOutput") {
+			t.Fatalf("dry run %d: %d %q", i, code, out)
+		}
+	}
+	if after, _ := os.ReadDir(filepath.Join(dir, ".aletheia", ".state")); len(after) != len(before) {
+		t.Fatalf("dry run must not write session state: %d → %d files", len(before), len(after))
+	}
+	if _, out, _ := runCLI(t, dir, "", "hook", "--dry-run", "unrelated words only"); !strings.Contains(out, "nothing would be added") {
+		t.Fatalf("an empty result should say so: %q", out)
+	}
+}
+
 func TestHookInjectsRecallOncePerSession(t *testing.T) {
 	t.Setenv("ALETHEIA_DIR", "")
 	dir := t.TempDir()
