@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/firatmio/aletheia/internal/anchor"
 	"github.com/firatmio/aletheia/internal/store"
 )
 
@@ -309,7 +310,7 @@ func TestRememberWarnsAboutCommentOnlyAnchors(t *testing.T) {
 	_, verdict, err = v.e.Remember(RememberInput{
 		Claim: "Default archive age is set in defaults()", Anchors: []string{`contains:lethe.go::o\.Days = 30`},
 	})
-	if err != nil || len(verdict.Notes) != 0 {
+	if err != nil || strings.Contains(strings.Join(verdict.Notes, " "), "only matches comments") {
 		t.Fatalf("a code anchor needs no warning: %v %+v", err, verdict)
 	}
 }
@@ -611,5 +612,84 @@ func TestGetHintsAtTheSameNameWithOtherCode(t *testing.T) {
 	g, _ := v.e.Get(m.ID)
 	if out := RenderGet(g); !strings.Contains(out, "Parse is declared, with other code, in anchors.go") || strings.Contains(out, "moved →") {
 		t.Fatalf("get should point a human at the changed declaration: %q", out)
+	}
+}
+
+func TestRememberAddsASealedSymbolForAContainsMatch(t *testing.T) {
+	v := newEnv(t)
+	v.write(t, "lethe.go", "package x\n\nfunc defaults(o *Options) {\n\to.Days = 30\n}\n\ntype Options struct{ Days int }\n")
+	v.write(t, "notes.md", "o.Days = 30\n")
+
+	m, verdict, err := v.e.Remember(RememberInput{Claim: "The default archive age is 30 days", Anchors: []string{`contains:lethe.go::o\.Days = 30`}})
+	if err != nil || len(m.Anchors) != 2 || !strings.HasPrefix(m.Anchors[1], "symbol:lethe.go::defaults@") {
+		t.Fatalf("the declaration the match is in should be anchored too: %q %v", m.Anchors, err)
+	}
+	if !strings.Contains(strings.Join(verdict.Notes, " "), "added symbol:lethe.go::defaults@") {
+		t.Fatalf("the agent should be told: %q", verdict.Notes)
+	}
+
+	m, _, err = v.e.Remember(RememberInput{Claim: "Options sets the archive age in defaults", Force: true,
+		Anchors: []string{`contains:lethe.go::o\.Days = 30`, "symbol:lethe.go::defaults"}})
+	if err != nil || len(m.Anchors) != 2 {
+		t.Fatalf("an explicit symbol anchor is not duplicated: %q %v", m.Anchors, err)
+	}
+	for _, spec := range []string{`contains:notes.md::o\.Days = 30`, `contains:lethe.go::^package x$`} {
+		m, _, err = v.e.Remember(RememberInput{Claim: "Archive age note " + spec, Force: true, Anchors: []string{spec}})
+		if err != nil || len(m.Anchors) != 1 {
+			t.Fatalf("%s is not inside a Go declaration: %q %v", spec, m.Anchors, err)
+		}
+	}
+}
+
+func TestContainsAnchorMovesWithItsDeclaration(t *testing.T) {
+	v := newEnv(t)
+	v.write(t, "parse.go", "package p\n\nfunc Parse(s string) int {\n\treturn len(s) + 1\n}\n\nfunc Other() {}\n")
+	m := v.remember(t, RememberInput{Claim: "Parse adds one to the length", Anchors: []string{`contains:parse.go::len\(s\) \+ 1`}})
+
+	v.write(t, "parse.go", "package p\n\nfunc Other() {}\n")
+	v.write(t, "anchors.go", "package p\n\n// Parse, moved here.\nfunc Parse(s string) int { return len(s) + 1 }\n")
+
+	got := v.e.Judge(m)
+	if got.Freshness != Moved || strings.Join(got.Reasons, ";") != "parse.go → anchors.go" || strings.Join(got.Pointers, ",") != "anchors.go:4" {
+		t.Fatalf("the contains anchor should move with Parse: %+v", got)
+	}
+	res, _ := v.e.Recall(RecallOptions{Query: "parse length"})
+	if !strings.Contains(res.Text(), "[moved: parse.go → anchors.go] Parse adds one to the length (anchors.go:4)") {
+		t.Fatalf("recall: %q", res.Text())
+	}
+	g, _ := v.e.Get(m.ID)
+	if out := RenderGet(g); strings.Count(out, "moved → anchors.go:4") != 2 {
+		t.Fatalf("get should show both anchors at the new place: %q", out)
+	}
+	if it, err := v.e.Reseal(m.ID, 0); err != nil || it.Freshness != Verified {
+		t.Fatalf("reseal should move both anchors: %+v %v", it, err)
+	}
+	after, _ := v.e.Store.Get(m.ID)
+	for _, a := range after.Anchors {
+		if !strings.Contains(a, "anchors.go::") {
+			t.Fatalf("every anchor should point at anchors.go now: %q", after.Anchors)
+		}
+	}
+}
+
+func TestContainsDoesNotJumpIntoAnotherDeclaration(t *testing.T) {
+	v := newEnv(t)
+	v.write(t, "x.go", "package p\n\nfunc F() { _ = \"marker\" }\n\nfunc G() int { return 7 }\n")
+	m := v.remember(t, RememberInput{Claim: "F uses the marker", Anchors: []string{`contains:x.go::"marker"`}})
+	g, err := anchor.Make(v.root, "symbol:x.go::G")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Anchors = []string{m.Anchors[0], g.String()} // the contains match is in F; only G is sealed
+	if err := v.e.Store.Save(m); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Remove(filepath.Join(v.root, "x.go")); err != nil {
+		t.Fatal(err)
+	}
+	v.write(t, "y.go", "package p\n\nfunc G() int { return 7 }\n\nfunc F2() { _ = \"marker\" }\n")
+	if got := v.e.Judge(m); got.Freshness != Stale {
+		t.Fatalf("G moved, but the marker is not inside G: the contains anchor must not follow it: %+v", got)
 	}
 }
