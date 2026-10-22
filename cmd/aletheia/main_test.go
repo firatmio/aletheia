@@ -370,6 +370,21 @@ func TestHookDryRunWithoutPromptShowsMemories(t *testing.T) {
 	}
 }
 
+func TestHookDryRunHeadingsFitThePrompt(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "go.mod", "module x\n\ngo 1.24\n")
+	writeFile(t, dir, "store.go", "package x\n\n// Store keeps memories.\ntype Store struct{}\n\nfunc (s *Store) Get() {}\n")
+	runCLI(t, dir, "", "init")
+	_, out, _ := runCLI(t, dir, "", "hook", "--dry-run", "--map-budget", "300")
+	if !strings.Contains(out, "Code map of the project") || strings.Contains(out, "for this prompt") {
+		t.Fatalf("without a prompt the map is an overview: %q", out)
+	}
+	_, out, _ = runCLI(t, dir, "", "hook", "--dry-run", "--map-budget", "300", "where is the store")
+	if !strings.Contains(out, "Code map for this prompt") {
+		t.Fatalf("with a prompt the map is fitted to it: %q", out)
+	}
+}
+
 func TestHookInjectsRecallOncePerSession(t *testing.T) {
 	t.Setenv("ALETHEIA_DIR", "")
 	dir := t.TempDir()
