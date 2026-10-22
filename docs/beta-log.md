@@ -180,3 +180,18 @@ What held:
 - **Upgrade command:** it removes `aletheia-old*.exe` copies that are no longer in use, then renames the current exe to `aletheia-old-<random>.exe`. A locked old copy stays and cannot collide. Tested twice in a row with an old copy already present. README and the guide use it, and the stray space is gone.
 - **Build-only questions:** when every topic word is about building, testing or shipping, the map is the build line alone.
 - **Relevance floor:** the code map gets the same floor as recall: files below 30% of the best match are dropped. On this repo, "add a CLI flag to recall" went from six files to the two that matter (`cmd/aletheia/main.go`, `internal/engine/recall.go`).
+
+## 2026-10-22: the fifth agent setup, after B11 (`0.1.0 (v0.0.0-20261022134418-9e1c7df1c841)`)
+
+The agent moved the old Aletheia files aside, fetched the guide with curl and followed it exactly.
+- **B9 to B11:** resolved.
+  - "how is this project built" returns only the build line.
+  - The new Windows upgrade command removed the old `aletheia-old.exe` and renamed the current exe without a collision.
+- **Init, dry-run and stats:** ran without errors.
+
+**B12 · open, for launch · left as notes, not fixed yet.**
+1. **WebFetch cache.** WebFetch still returned the previous Windows upgrade command after the deploy. An agent that only uses WebFetch would hit the bug fixed in B11.
+   - **Weak date line:** "Updated 2026-10-22" is the same in all four versions of the day, so an agent cannot tell its copy is old.
+   - **Idea:** put a build stamp in the guide, such as a commit hash or a timestamp, that an agent can compare with `aletheia version` or with the curl result.
+2. **Dry-run heading.** Without a prompt the heading still says "Code map for this prompt". It should say "Code map" or "Project code map".
+3. **Not Aletheia's problem, worth knowing.** Claude Code's auto mode blocked deleting the project's old Aletheia files during the reset. `Remove-Item "$bin\aletheia-old*.exe"` passed.
