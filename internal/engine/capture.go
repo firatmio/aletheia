@@ -15,6 +15,10 @@ import (
 // CaptureSource marks memories written by CaptureMap rather than by an agent.
 const CaptureSource = "aletheia-capture"
 
+// capturePrefix starts every captured map's claim. Recall does not index it:
+// "task" would otherwise match every map.
+const capturePrefix = "Map: a task like "
+
 // Limits for captured maps.
 const (
 	maxCapturedFiles = 8
@@ -48,7 +52,7 @@ func (e *Engine) CaptureMap(task string, files []string) (*store.Memory, error) 
 	if len(names) == 0 || task == "" {
 		return nil, nil
 	}
-	claim := fmt.Sprintf("Map: a task like %q changed %s", task, strings.Join(names, ", "))
+	claim := fmt.Sprintf(capturePrefix+"%q changed %s", task, strings.Join(names, ", "))
 
 	// Same kind of change = mostly the same folders and kinds of files. Such
 	// earlier captured maps are replaced, so maps do not pile up per task.

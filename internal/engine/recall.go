@@ -18,6 +18,9 @@ import (
 const (
 	DefaultBudget = 600 // estimated tokens
 	DefaultLimit  = 8
+	// RelevanceFloor drops memories that score below this share of the best
+	// match, so a few weak matches do not fill the limit.
+	RelevanceFloor = 0.3
 )
 
 // RecallOptions controls a recall.
@@ -66,7 +69,11 @@ func hasTag(m *store.Memory, tag string) bool {
 
 func docTerms(m *store.Memory) []string {
 	var t []string
-	ct := search.Tokenize(m.Claim)
+	claim := m.Claim
+	if m.Source == CaptureSource {
+		claim = strings.TrimPrefix(claim, capturePrefix)
+	}
+	ct := search.Tokenize(claim)
 	for i := 0; i < 3; i++ {
 		t = append(t, ct...)
 	}
@@ -111,7 +118,7 @@ func (e *Engine) Recall(o RecallOptions) (*RecallResult, error) {
 	}
 	var cands []cand
 	query := strings.TrimSpace(o.Query)
-	qt := search.Tokenize(query)
+	qt := search.ContentTerms(search.Tokenize(query))
 	switch {
 	case len(qt) > 0:
 		docs := make([]search.Doc, len(pool))
@@ -126,12 +133,12 @@ func (e *Engine) Recall(o RecallOptions) (*RecallResult, error) {
 			}
 		}
 		for _, m := range pool {
-			if s := scores[m.ID]; s > 0 {
-				cands = append(cands, cand{m, s / max})
+			if rel := scores[m.ID] / max; rel >= RelevanceFloor {
+				cands = append(cands, cand{m, rel})
 			}
 		}
 	case query != "":
-		return res, nil // the query had no searchable words
+		return res, nil // the query had no searchable words, or only stopwords
 	default:
 		for _, m := range pool {
 			cands = append(cands, cand{m, 1})

@@ -243,19 +243,6 @@ func splitWords(s string) string {
 	return b.String()
 }
 
-// stopwords are words in task prompts that say nothing about where code
-// lives ("add a new function that returns ...").
-var stopwords = map[string]bool{}
-
-func init() {
-	for _, w := range search.Tokenize("the a an and or of to in on at for with by from into that this these those it its is are be " +
-		"should must can will when all any each every some three two one new add adds added make create implement " +
-		"implementation update change fix use using used return returns returning depending please also so then than " +
-		"function functions method methods file files code value values number numbers call calls time") {
-		stopwords[w] = true
-	}
-}
-
 func words(s string) []string { return search.Tokenize(splitWords(s)) }
 
 func nameMatches(name string, query map[string]bool) int {
@@ -291,7 +278,7 @@ func (m *Map) Render(query string, budget int) string {
 	q := map[string]bool{}
 	weights := map[string]float64{} // a word the prompt repeats is its topic: "builtin ... builtins"
 	for _, w := range words(query) {
-		if !stopwords[w] {
+		if !search.IsStopword(w) {
 			q[w] = true
 			weights[w]++
 		}
