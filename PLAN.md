@@ -116,6 +116,16 @@ Status 2026-10-21 (first pass, details in `docs/dogfood-4.2.md`):
 - Run `goreleaser check` and `goreleaser release --snapshot --clean` locally.
 - Tag `v0.1.0`. Verify `go install github.com/firatmio/aletheia/cmd/aletheia@latest` works from a clean machine.
 
+Status 2026-10-22: the snapshot works (goreleaser v2.10.2 in Docker).
+- **Check:** `goreleaser check` passes.
+- **Snapshot:** builds 6 binaries (linux/darwin/windows × amd64/arm64) and 6 archives of about 1.4 MB each, with LICENSE and README, plus checksums that verify.
+- **Smoke tests:**
+  - **Windows amd64:** runs natively.
+  - **Linux amd64:** runs in a clean Alpine container: init, remember, recall.
+  - **macOS:** built, not run.
+- **Fix needed:** `go.mod` said `go 1.24.7` since the scaffold, so Go 1.24.0–1.24.6 either downloaded a toolchain or failed (`GOTOOLCHAIN=local`), and the snapshot failed in goreleaser's image (Go 1.24.4). It is now `go 1.24`, matching the README's "Go 1.24+". Tests pass on Go 1.24.0 with `GOTOOLCHAIN=local`.
+- **Left:** tagging `v0.1.0` and the real release wait for the repository to go public. The release workflow cannot run while Actions are restricted; `goreleaser release --clean` can run locally with a token.
+
 ### 4.4 Brand, README and landing page (decided with Fırat, 2026-10-21)
 - **No mascot.** The owl was dropped, and an anchor character was tried and dropped. Generated or stock imagery did not match.
 - **Mark: ἀ**, the alpha of ἀλήθεια, with the breathing mark in "verified" green.
