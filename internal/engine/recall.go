@@ -83,7 +83,7 @@ func docTerms(m *store.Memory) []string {
 	return append(t, search.Tokenize(m.Body)...)
 }
 
-var freshnessFactor = map[Freshness]float64{Verified: 1, Unverifiable: 0.7, Stale: 0.3}
+var freshnessFactor = map[Freshness]float64{Verified: 1, Moved: 0.9, Unverifiable: 0.7, Stale: 0.3}
 
 // Recall ranks memories by relevance, verifies the best candidates against
 // the project, hides stale ones, and packs the answer into the token budget.
@@ -164,12 +164,13 @@ func (e *Engine) Recall(o RecallOptions) (*RecallResult, error) {
 	}
 
 	var ranked []Hit
+	scan := &goScan{root: e.Store.Root}
 	for _, c := range cands {
 		if sent[c.m.ID] {
 			res.AlreadySent++
 			continue
 		}
-		v := e.Judge(c.m)
+		v := e.judge(c.m, scan)
 		if v.Freshness == Stale && !o.IncludeStale {
 			res.HiddenStale = append(res.HiddenStale, c.m.ID)
 			continue

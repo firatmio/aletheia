@@ -15,6 +15,11 @@ func Label(f Freshness, reasons []string) string {
 		return "ok"
 	case Unverifiable:
 		return "?"
+	case Moved:
+		if len(reasons) == 0 {
+			return "moved"
+		}
+		return "moved: " + strings.Join(reasons, "; ")
 	}
 	if len(reasons) == 0 {
 		return "stale"
@@ -87,10 +92,15 @@ func RenderSaved(m *store.Memory, v Verdict) string {
 
 func shortAnchor(raw string) string {
 	a, err := anchor.Parse(raw)
-	if err != nil || a.Kind != anchor.KindFile || len(a.Arg) != 64 {
+	switch {
+	case err != nil:
 		return raw
+	case a.Kind == anchor.KindFile && len(a.Arg) == 64:
+		return "file:" + a.Path + "@" + a.Arg[:8] + "…"
+	case a.Kind == anchor.KindSymbol && a.Seal != "":
+		return "symbol:" + a.Path + "::" + a.Arg + "@" + a.Seal[:8] + "…"
 	}
-	return "file:" + a.Path + "@" + a.Arg[:8] + "…"
+	return raw
 }
 
 // RenderGet renders a full memory with per-anchor status.
@@ -119,7 +129,10 @@ func RenderGet(g *GetResult) string {
 		b.WriteString("\nanchors:")
 		for _, a := range g.Anchors {
 			mark := "ok"
-			if !a.OK {
+			switch {
+			case a.MovedTo != "":
+				mark = "moved → " + a.MovedTo
+			case !a.OK:
 				mark = "FAIL " + a.Detail
 			}
 			fmt.Fprintf(&b, "\n  %s  %s", shortAnchor(a.Raw), mark)
@@ -138,12 +151,15 @@ func (v VerifyItem) Text() string {
 
 // Summarize counts verification results and lists the non-verified ones.
 func Summarize(items []VerifyItem) string {
-	var v, u, s int
+	var v, u, s, mv int
 	var lines []string
 	for _, it := range items {
 		switch it.Freshness {
 		case Verified:
 			v++
+		case Moved:
+			mv++
+			lines = append(lines, fmt.Sprintf("%s [%s] %s", it.ID, Label(it.Freshness, it.Reasons), it.Claim))
 		case Unverifiable:
 			u++
 		case Stale:
@@ -152,6 +168,9 @@ func Summarize(items []VerifyItem) string {
 		}
 	}
 	head := fmt.Sprintf("%d verified · %d unanchored · %d stale", v, u, s)
+	if mv > 0 {
+		head += fmt.Sprintf(" · %d moved (verify <id> --reseal records the new place)", mv)
+	}
 	if len(lines) == 0 {
 		return head
 	}

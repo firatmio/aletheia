@@ -353,7 +353,7 @@ func TestFilesNamedInClaimAreAnchored(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"symbol:builtin/lib.go::Clamp", "exists:builtin/builtin.go", "exists:docs/language.md", "exists:.gitignore"}
+	want := []string{"symbol:builtin/lib.go::Clamp@7370a7fe3669256c", "exists:builtin/builtin.go", "exists:docs/language.md", "exists:.gitignore"}
 	if strings.Join(m.Anchors, " ") != strings.Join(want, " ") {
 		t.Fatalf("anchors = %q, want %q", m.Anchors, want)
 	}
@@ -524,5 +524,92 @@ func TestParseTTL(t *testing.T) {
 		if _, err := ParseTTL(in); err == nil {
 			t.Errorf("ParseTTL(%q) should fail", in)
 		}
+	}
+}
+
+func TestMovedMemoryComesBackWithItsNewPlace(t *testing.T) {
+	v := newEnv(t)
+	v.write(t, "parse.go", "package p\n\nfunc Parse(s string) int {\n\treturn len(s)\n}\n\nfunc Other() {}\n")
+	m := v.remember(t, RememberInput{Claim: "Specs are measured by Parse", Anchors: []string{"symbol:parse.go::Parse"}})
+
+	v.write(t, "parse.go", "package p\n\nfunc Other() {}\n")
+	v.write(t, "anchors.go", "package p\n\n// Parse, moved here.\nfunc Parse(s string) int { return len(s) }\n")
+
+	got := v.e.Judge(m)
+	if got.Freshness != Moved || strings.Join(got.Reasons, ";") != "parse.go → anchors.go" || strings.Join(got.Pointers, ",") != "anchors.go:4" {
+		t.Fatalf("the same code in another file is a move: %+v", got)
+	}
+	res, _ := v.e.Recall(RecallOptions{Query: "parse specs"})
+	if len(res.Hits) != 1 || !strings.Contains(res.Text(), "[moved: parse.go → anchors.go] Specs are measured by Parse (anchors.go:4)") {
+		t.Fatalf("recall should show the moved memory, not hide it: %q", res.Text())
+	}
+	if s := Summarize(v.e.VerifyAll()); !strings.Contains(s, "0 stale · 1 moved") {
+		t.Fatalf("verify should count it as moved, not stale: %q", s)
+	}
+	if st := v.e.Stats(); st.Moved != 1 || st.Stale != 0 {
+		t.Fatalf("stats: %+v", st)
+	}
+	if g, _ := v.e.Get(m.ID); !strings.Contains(RenderGet(g), "moved → anchors.go:4") {
+		t.Fatalf("get should show where the anchor's code is now: %q", RenderGet(g))
+	}
+
+	it, err := v.e.Reseal(m.ID, 0)
+	if err != nil || it.Freshness != Verified {
+		t.Fatalf("reseal should record the move: %+v %v", it, err)
+	}
+	after, _ := v.e.Store.Get(m.ID)
+	if !strings.HasPrefix(after.Anchors[0], "symbol:anchors.go::Parse@") {
+		t.Fatalf("the anchor should now point at anchors.go: %q", after.Anchors)
+	}
+}
+
+func TestMovedCodeDoesNotSaveAClaimAboutTheOldFile(t *testing.T) {
+	v := newEnv(t)
+	v.write(t, "parse.go", "package p\n\nfunc Parse(s string) int { return len(s) }\n\nfunc Other() {}\n")
+	m := v.remember(t, RememberInput{Claim: "Parse lives in parse.go", Anchors: []string{"symbol:parse.go::Parse"}})
+
+	v.write(t, "parse.go", "package p\n\nfunc Other() {}\n")
+	v.write(t, "anchors.go", "package p\n\nfunc Parse(s string) int { return len(s) }\n")
+
+	if got := v.e.Judge(m); got.Freshness != Stale {
+		t.Fatalf("the claim names parse.go, which no longer has Parse: %+v", got)
+	}
+	if _, err := v.e.Reseal(m.ID, 0); err == nil || !strings.Contains(err.Error(), "supersede") {
+		t.Fatalf("reseal must refuse and point to supersede: %v", err)
+	}
+}
+
+func TestUnsealedSymbolAnchorsDoNotMove(t *testing.T) {
+	v := newEnv(t)
+	v.write(t, "parse.go", "package p\n\nfunc Parse(s string) int { return len(s) }\n")
+	m := v.remember(t, RememberInput{Claim: "Specs are measured by Parse", Anchors: []string{"symbol:parse.go::Parse"}})
+	m.Anchors = []string{"symbol:parse.go::Parse"} // as saved by a version before seals
+	if err := v.e.Store.Save(m); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(v.root, "parse.go")); err != nil {
+		t.Fatal(err)
+	}
+	v.write(t, "anchors.go", "package p\n\nfunc Parse(s string) int { return len(s) }\n")
+	if got := v.e.Judge(m); got.Freshness != Stale {
+		t.Fatalf("without a seal there is nothing to prove a move with: %+v", got)
+	}
+}
+
+func TestGetHintsAtTheSameNameWithOtherCode(t *testing.T) {
+	v := newEnv(t)
+	v.write(t, "parse.go", "package p\n\nfunc Parse(s string) int { return len(s) }\n")
+	m := v.remember(t, RememberInput{Claim: "Specs are measured by Parse", Anchors: []string{"symbol:parse.go::Parse"}})
+	if err := os.Remove(filepath.Join(v.root, "parse.go")); err != nil {
+		t.Fatal(err)
+	}
+	v.write(t, "anchors.go", "package p\n\nfunc Parse(s string) int { return len(s) * 2 }\n")
+
+	if got := v.e.Judge(m); got.Freshness != Stale {
+		t.Fatalf("moved and changed is not a move: %+v", got)
+	}
+	g, _ := v.e.Get(m.ID)
+	if out := RenderGet(g); !strings.Contains(out, "Parse is declared, with other code, in anchors.go") || strings.Contains(out, "moved →") {
+		t.Fatalf("get should point a human at the changed declaration: %q", out)
 	}
 }

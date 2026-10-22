@@ -8,6 +8,10 @@
 //	exists:src/auth             the path still exists
 //	symbol:store.go::Store.Get  the file still declares this function, method,
 //	                            type, var or const
+//	symbol:store.go::Store.Get@<fingerprint>
+//	                            the same, sealed: a Go declaration's
+//	                            fingerprint, so it can be recognised if it
+//	                            moves to another file (see Relocate)
 //
 // Verification only reads files inside the project root. It never executes
 // anything, so a poisoned memory file cannot run code on the machine.
@@ -50,10 +54,13 @@ var errMissing = errors.New("missing")
 
 // Anchor is a parsed anchor. Arg is the content hash for file anchors, the
 // regular expression for contains anchors and the name for symbol anchors.
+// Seal is a symbol anchor's fingerprint of the declaration (Go only; empty
+// when unsealed). Check ignores it: edits in place never stale a symbol.
 type Anchor struct {
 	Kind Kind
 	Path string
 	Arg  string
+	Seal string
 }
 
 // Result is the outcome of checking one anchor.
@@ -75,7 +82,10 @@ func (a Anchor) String() string {
 	case KindContains:
 		return "contains:" + a.Path + "::" + a.Arg
 	case KindSymbol:
-		return "symbol:" + a.Path + "::" + a.Arg
+		if a.Seal == "" {
+			return "symbol:" + a.Path + "::" + a.Arg
+		}
+		return "symbol:" + a.Path + "::" + a.Arg + "@" + a.Seal
 	default:
 		return "exists:" + a.Path
 	}
@@ -143,14 +153,18 @@ func Parse(raw string) (Anchor, error) {
 		return Anchor{Kind: KindExists, Path: cp}, nil
 	case KindSymbol:
 		p, name, ok := strings.Cut(rest, "::")
+		name, seal, sealed := strings.Cut(name, "@")
 		if !ok || !symbolName.MatchString(name) {
 			return Anchor{}, fmt.Errorf("%w: symbol needs path::Name or path::Type.Method", ErrFormat)
+		}
+		if sealed && !isSeal(seal) {
+			return Anchor{}, fmt.Errorf("%w: symbol fingerprint must be %d lowercase hex digits", ErrFormat, 2*sealBytes)
 		}
 		cp, err := cleanRel(p)
 		if err != nil {
 			return Anchor{}, err
 		}
-		return Anchor{Kind: KindSymbol, Path: cp, Arg: name}, nil
+		return Anchor{Kind: KindSymbol, Path: cp, Arg: name, Seal: seal}, nil
 	}
 	return Anchor{}, fmt.Errorf("%w: unknown kind %q (want file, contains, exists, symbol)", ErrFormat, kind)
 }
@@ -352,12 +366,20 @@ func Check(root string, a Anchor) Result {
 }
 
 // Make parses a user-supplied spec, seals file anchors with the current
-// hash, and refuses anchors that do not hold right now. This is what stops
-// an agent from recording a claim its own evidence contradicts.
+// hash and Go symbol anchors with the declaration's fingerprint, and
+// refuses anchors that do not hold right now. This is what stops an agent
+// from recording a claim its own evidence contradicts.
 func Make(root, spec string) (Anchor, error) {
 	a, err := Parse(spec)
 	if err != nil {
 		return Anchor{}, err
+	}
+	if a.Kind == KindSymbol {
+		a.Seal = "" // computed below, never taken from the spec
+		if r := Check(root, a); !r.OK {
+			return Anchor{}, fmt.Errorf("anchor does not hold right now: %s", r.Detail)
+		}
+		return sealSymbol(root, a), nil
 	}
 	if a.Kind == KindFile && a.Arg == "" {
 		full, err := resolve(root, a.Path)
@@ -377,8 +399,21 @@ func Make(root, spec string) (Anchor, error) {
 }
 
 // Reseal re-hashes a file anchor after a human or agent has re-checked the
-// claim. Other kinds must still hold as written.
+// claim. A symbol anchor gets a fresh fingerprint, and one whose sealed
+// declaration moved unchanged to another file points there from now on.
+// Other kinds must still hold as written.
 func Reseal(root string, a Anchor) (Anchor, error) {
+	if a.Kind == KindSymbol {
+		r := Check(root, a)
+		if r.OK {
+			return sealSymbol(root, a), nil
+		}
+		if m, _, ok := Relocate(a, GoFiles(root)); ok {
+			a.Path = m.Path
+			return a, nil
+		}
+		return a, errors.New(r.Detail)
+	}
 	if a.Kind != KindFile {
 		if r := Check(root, a); !r.OK {
 			return a, errors.New(r.Detail)

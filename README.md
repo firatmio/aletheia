@@ -116,6 +116,10 @@ Aletheia pays off where finding the right place is expensive, in mid-size and la
 
 - Use `symbol` for claims about one declaration and `contains` for one thing in a file. Use `file` only when any change should trigger a re-check.
 - Recall shows where `symbol` and `contains` evidence is right now, e.g. `(store.go:15-21)`. Go declarations get their full range from `go/parser`; other languages get the declaring line.
+- **Moved code.** A Go `symbol` anchor is sealed with a fingerprint of the declaration (`symbol:store.go::Store.Get@3f9a…`). The fingerprint ignores comments and layout.
+  - **Edits in place:** they never stale the anchor. If the declaration is still in its file, the fingerprint is not even consulted.
+  - **A moved declaration:** if the declaration leaves its file, Aletheia searches the project for it. When exactly one declaration with that name has the same fingerprint, the memory comes back as `[moved: old.go → new.go]` with the new lines, and `verify <id> --reseal` records the new path.
+  - **Anything less certain stays stale and hidden:** the code changed on the way, several copies match, or the claim names the old file.
 - In a `contains` pattern, a run of spaces matches any run of spaces or tabs, so reformatting does not stale it.
 - Files named in a claim get an `exists:` anchor automatically.
 - `remember` warns when a `contains` anchor only matches comments, since a comment can stay while the code changes.
