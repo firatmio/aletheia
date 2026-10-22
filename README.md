@@ -56,7 +56,14 @@ cd your-project
 aletheia init --agents     # creates .aletheia/ and adds usage notes to CLAUDE.md and AGENTS.md
 ```
 
-For Claude Code, add the two hooks to `.claude/settings.json`. Recall then happens on every prompt and costs the agent nothing:
+For Claude Code, add the two hooks. Recall then happens on every prompt and costs the agent nothing:
+
+```bash
+aletheia init --claude-hooks   # merges them into .claude/settings.json, keeps your other settings
+aletheia hook --dry-run "how is this project built"   # what an agent would get; changes nothing
+```
+
+Run `init --claude-hooks` yourself. Agents are usually not allowed to change their own hooks, and that is by design. To edit the file by hand instead, use this:
 
 ```json
 {
@@ -66,6 +73,8 @@ For Claude Code, add the two hooks to `.claude/settings.json`. Recall then happe
   }
 }
 ```
+
+An agent can also do the rest of the setup from the [agent guide](https://aletheia.firattunaarslan.me/agents.md). It hands the hook step to you as that single command.
 
 Memories live in `.aletheia/memories/*.md` as plain Markdown. Commit them and your team, and every agent, shares one memory that verifies itself on each machine.
 
@@ -178,7 +187,7 @@ Edit memories by hand, review them in pull requests, grep them. They are just fi
 <summary><b>CLI</b></summary>
 
 ```text
-aletheia init [dir] [--agents]
+aletheia init [dir] [--agents] [--claude-hooks]
 aletheia remember <claim> [--anchor SPEC]... [--body TEXT|-] [--tag T]... [--ttl 30d]
                   [--confidence 0.8] [--supersedes ID]... [--source NAME] [--force]
 aletheia remember - [--source NAME] [--force]            # several at once: one JSON object per line on stdin
@@ -186,7 +195,7 @@ aletheia recall [query] [--budget N] [--limit N] [--full] [--stale] [--tag T] [-
 aletheia get <id> [--json]
 aletheia verify [id] [--reseal] [--ttl 30d] [--json]   # exits 1 if anything is stale (CI-friendly)
 aletheia map [topic] [--budget 600]
-aletheia hook [--budget N] [--map-budget N]              # Claude Code UserPromptSubmit and Stop hook
+aletheia hook [--budget N] [--map-budget N] [--dry-run [prompt]]   # Claude Code hook; every command takes --help
 aletheia lethe [--days 30] [--apply]                     # archive superseded and long-stale memories
 aletheia stats [--json]
 aletheia serve [--dir DIR]                               # MCP server on stdio

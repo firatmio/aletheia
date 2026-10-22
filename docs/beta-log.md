@@ -79,3 +79,33 @@ On this repo's store the B2 query now returns nothing; there is no capture memor
   - the same prompt recalls nothing;
   - "Siteyi vercel cli ile yayınlarsın" still finds the site map;
   - "recall nasıl sıralanıyor" finds the ranking memories, the same as "how is recall ranked".
+
+## 2026-10-22: an agent sets Aletheia up in another project
+
+Fırat asked a Claude Code session in another project to set Aletheia up from `/agents.md`. These are the session's own report and what happened around it.
+
+**B8 · friction · the setup flow assumed the agent may configure itself.** Five problems, most serious first:
+
+1. **Hooks are the user's step.** Writing `.claude/settings.json` was blocked as self-modification. This is Claude Code's safety model, not a bug: a hook runs a command on every prompt. The guide told the agent to add the hooks, and the session was flagged as suspicious when it tried.
+2. **The guide's commands read like prompt injection.** Imperative lines such as "follow this page top to bottom" and "tell the user and stop" made the agent distrust the page. It only went on because Fırat asked directly. WebFetch also summarized the page, so commands and JSON could be altered on the way.
+3. **The guide ignored the local state.** It said `go install` fails and not to try other ways, while `aletheia` was already installed on that machine.
+4. **No help for the hook.** `aletheia hook --help` gave "unknown flag", and the stdin format was undocumented. The agent built a guessed test input, and running it was blocked as well.
+5. **Cold start.** After `init`, recall finds nothing (correct, but no value on day one), and `init` did not say what comes next.
+
+**Fixed on branch `feat/safer-setup`:**
+- **`aletheia init --claude-hooks`:** merges the two hooks into `.claude/settings.json`, keeps other settings and their order, does nothing on a second run, and refuses broken JSON instead of overwriting it. The guide and README say to run it yourself.
+- **`/agents.md` rewritten:**
+  - It describes rather than commands, and says which steps are the user's.
+  - It is shorter (3.5k characters, was about 5.5k), with everything meant to be copied verbatim in short code blocks.
+  - It is served as `text/plain`.
+  - Its first step is to check `aletheia version`.
+- **Help:**
+  - Every subcommand takes `-h`/`--help`.
+  - `hook --help` documents both stdin formats.
+  - `aletheia hook --dry-run "<prompt>"` shows what the hook would add, without reading stdin or writing state.
+- **`init` prints the next steps:**
+  - `--agents` and `--claude-hooks` when they are not done yet;
+  - the MCP block;
+  - the dry-run check;
+  - that the code map works from the first prompt.
+- **Not done:** a separate bootstrap scan for the cold start. The code map already gives value from the first prompt; the `init` output now says so.

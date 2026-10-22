@@ -39,7 +39,9 @@ const (
 const usage = `aletheia: memory for AI agents that checks itself against reality
 
 Usage:
-  aletheia init [dir] [--agents]
+  aletheia init [dir] [--agents] [--claude-hooks]
+                                      --agents: usage notes in CLAUDE.md and AGENTS.md
+                                      --claude-hooks: the two hooks in .claude/settings.json
   aletheia remember <claim> [--anchor SPEC]... [--body TEXT|-] [--tag T]... [--ttl 30d]
                     [--confidence 0.8] [--supersedes ID]... [--source NAME] [--force]
   aletheia remember - [--source NAME] [--force]
@@ -53,7 +55,7 @@ Usage:
   aletheia stats [--json]
   aletheia serve [--dir DIR]          MCP server on stdio
   aletheia map [topic] [--budget N]   where relevant declarations are (file: Name lines)
-  aletheia hook [--budget N] [--map-budget N]
+  aletheia hook [--budget N] [--map-budget N] [--dry-run [prompt]]
                                       Claude Code UserPromptSubmit and Stop hook (JSON on stdin)
   aletheia version
 
@@ -85,6 +87,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	c := &cli{in: stdin, out: stdout, err: stderr}
 	cmd, rest := args[0], args[1:]
+	for _, a := range rest {
+		if a == "-h" || a == "--help" {
+			if h := commandHelp(cmd); h != "" {
+				fmt.Fprint(stdout, h)
+				return exitOK
+			}
+		}
+	}
 	switch cmd {
 	case "help", "-h", "--help":
 		fmt.Fprint(stdout, usage)
@@ -115,6 +125,48 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stderr, "aletheia: unknown command %q\n\n%s", cmd, usage)
 	return exitUsage
+}
+
+// commandHelp returns the usage lines of one command plus its notes, or ""
+// for an unknown command.
+func commandHelp(cmd string) string {
+	var b strings.Builder
+	in := false
+	for _, l := range strings.Split(usage, "\n") {
+		switch {
+		case l == "  aletheia "+cmd || strings.HasPrefix(l, "  aletheia "+cmd+" "):
+			in = true
+		case strings.HasPrefix(l, "  aletheia ") || strings.TrimSpace(l) == "":
+			in = false
+		}
+		if in {
+			b.WriteString(l + "\n")
+		}
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	return "Usage:\n" + b.String() + commandNotes[cmd] + "\nRun `aletheia help` for anchors, environment and exit codes.\n"
+}
+
+// commandNotes are details that do not fit the one-line usage.
+var commandNotes = map[string]string{
+	"hook": `
+Claude Code runs it with one JSON object on stdin:
+  {"hook_event_name": "UserPromptSubmit", "session_id": "…", "prompt": "…", "cwd": "…"}
+    prints {"hookSpecificOutput": {"additionalContext": "…"}}: verified memories for the
+    prompt and, once per session, a code map
+  {"hook_event_name": "Stop", "session_id": "…", "transcript_path": "…", "cwd": "…"}
+    records which files the task changed as a map memory; prints nothing
+Install it with: aletheia init --claude-hooks
+To see what it would add for a prompt, without reading stdin or changing anything:
+  aletheia hook --dry-run "how is this project built"
+`,
+	"init": `
+--claude-hooks merges the UserPromptSubmit and Stop hooks into .claude/settings.json and
+keeps every other setting. Run it yourself: agents are usually not allowed to change
+their own hooks.
+`,
 }
 
 // --- flag parsing ------------------------------------------------------------
@@ -234,7 +286,7 @@ func (c *cli) open(f *flagSet) (*engine.Engine, error) {
 // --- commands ----------------------------------------------------------------
 
 func (c *cli) init(args []string) int {
-	f, err := parseFlags(args, []string{"agents"}, nil)
+	f, err := parseFlags(args, []string{"agents", "claude-hooks"}, nil)
 	if err != nil {
 		return c.usageErr(err)
 	}
@@ -264,7 +316,33 @@ func (c *cli) init(args []string) int {
 		}
 		fmt.Fprintln(c.out, msg)
 	}
+	if f.bools["claude-hooks"] {
+		msg, err := installClaudeHooks(st.Root)
+		if err != nil {
+			return c.fail(err)
+		}
+		fmt.Fprintln(c.out, msg)
+	}
+	fmt.Fprint(c.out, nextSteps(f.bools["agents"], f.bools["claude-hooks"]))
 	return exitOK
+}
+
+// nextSteps tells the user what is left after init. Connecting an agent
+// changes that agent's configuration, so it is printed, not done.
+func nextSteps(agents, hooks bool) string {
+	var b strings.Builder
+	b.WriteString("\nnext steps:\n")
+	if !agents {
+		b.WriteString("  aletheia init --agents          usage notes for agents in CLAUDE.md and AGENTS.md\n")
+	}
+	if !hooks {
+		b.WriteString("  aletheia init --claude-hooks    Claude Code: recall on every prompt, maps at the end of a task\n" +
+			"                                  (run it yourself; agents usually may not change their own hooks)\n")
+	}
+	b.WriteString(`  other MCP clients: {"mcpServers": {"aletheia": {"command": "aletheia", "args": ["serve"]}}}` + "\n" +
+		`  aletheia hook --dry-run "how is this project built"   see what an agent would get` + "\n" +
+		"memories start empty; the code map works from the first prompt (aletheia map \"<topic>\")\n")
+	return b.String()
 }
 
 // agentFiles are the instruction files agents load on their own: Claude Code
@@ -446,7 +524,7 @@ const hookPreamble = "Aletheia project memory for this prompt " +
 // same session are skipped. It never blocks a prompt: on any problem it
 // prints nothing.
 func (c *cli) hook(args []string) int {
-	f, err := parseFlags(args, nil, []string{"budget", "limit", "map-budget"})
+	f, err := parseFlags(args, []string{"dry-run"}, []string{"budget", "limit", "map-budget"})
 	if err != nil {
 		return c.usageErr(err)
 	}
@@ -461,6 +539,21 @@ func (c *cli) hook(args []string) int {
 	mapBudget, err := f.intv("map-budget", -1) // -1: sized to the project
 	if err != nil {
 		return c.usageErr(err)
+	}
+	if f.bools["dry-run"] {
+		// What the prompt hook would add, without stdin, session state or
+		// any write: a safe way to check the setup.
+		e, err := c.open(f)
+		if err != nil {
+			return c.fail(err)
+		}
+		parts := hookContext(e, strings.Join(f.pos, " "), "", budget, limit, mapBudget)
+		if len(parts) == 0 {
+			fmt.Fprintln(c.out, "nothing would be added for this prompt")
+			return exitOK
+		}
+		fmt.Fprintln(c.out, strings.Join(parts, "\n\n"))
+		return exitOK
 	}
 	var in struct {
 		Event          string `json:"hook_event_name"`
@@ -483,24 +576,7 @@ func (c *cli) hook(args []string) int {
 		captureStop(e, in.SessionID, in.TranscriptPath)
 		return exitOK // Stop output would reach the agent; it gets none
 	}
-	res, err := e.Recall(engine.RecallOptions{Query: in.Prompt, Budget: budget, Limit: limit, Session: in.SessionID})
-	if err != nil {
-		res, err = e.Recall(engine.RecallOptions{Query: in.Prompt, Budget: budget, Limit: limit}) // odd session id
-	}
-	var parts []string
-	if err == nil && (len(res.Hits) > 0 || len(res.HiddenStale) > 0) {
-		parts = append(parts, hookPreamble+res.Text())
-	}
-	if mapBudget != 0 && firstInSession(e.Store, in.SessionID, "map") {
-		if m, err := codemap.Build(e.Store.Root); err == nil {
-			if mapBudget < 0 {
-				mapBudget = m.SuggestedBudget()
-			}
-			if s := m.Render(in.Prompt, mapBudget); mapBudget > 0 && s != "" {
-				parts = append(parts, mapPreamble+s)
-			}
-		}
-	}
+	parts := hookContext(e, in.Prompt, in.SessionID, budget, limit, mapBudget)
 	if len(parts) == 0 {
 		return exitOK
 	}
@@ -509,6 +585,31 @@ func (c *cli) hook(args []string) int {
 		"additionalContext": strings.Join(parts, "\n\n"),
 	}})
 	return exitOK
+}
+
+// hookContext is what the prompt hook adds for a prompt: verified memories,
+// and the code map once per session. An empty session (dry run) sends the
+// map and records nothing.
+func hookContext(e *engine.Engine, prompt, session string, budget, limit, mapBudget int) []string {
+	res, err := e.Recall(engine.RecallOptions{Query: prompt, Budget: budget, Limit: limit, Session: session})
+	if err != nil {
+		res, err = e.Recall(engine.RecallOptions{Query: prompt, Budget: budget, Limit: limit}) // odd session id
+	}
+	var parts []string
+	if err == nil && (len(res.Hits) > 0 || len(res.HiddenStale) > 0) {
+		parts = append(parts, hookPreamble+res.Text())
+	}
+	if mapBudget != 0 && (session == "" || firstInSession(e.Store, session, "map")) {
+		if m, err := codemap.Build(e.Store.Root); err == nil {
+			if mapBudget < 0 {
+				mapBudget = m.SuggestedBudget()
+			}
+			if s := m.Render(prompt, mapBudget); mapBudget > 0 && s != "" {
+				parts = append(parts, mapPreamble+s)
+			}
+		}
+	}
+	return parts
 }
 
 // mapPreamble introduces the code map in the agent's context.

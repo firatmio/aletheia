@@ -194,23 +194,18 @@ export const quickstart = {
       id: "agent",
       label: "Let your agent do it",
       blocks: [
-        { note: "Paste this into Claude Code, Cursor or any coding agent:", code: `Read ${site.url}/agents.md and set up Aletheia in this project.` },
-        { note: "/agents.md is plain Markdown written for agents: install, connect, and how to use memory well, in one read. /llms.txt indexes it.", code: "" },
+        { note: "Paste this into Claude Code, Cursor or any coding agent:", code: `Help me set up Aletheia in this project. The setup guide is plain text at ${site.url}/agents.md` },
+        { note: "The agent installs and initializes; the one step that changes the agent's own configuration (the hooks) it hands to you as a single command. /llms.txt indexes the guide.", code: "" },
       ],
     },
     {
       id: "claude",
       label: "Claude Code",
       blocks: [
-        { note: "Install and set up the project:", code: `${site.install}\ncd your-project\naletheia init --agents` },
+        { note: "Install and set up the project:", code: `${site.install}\ncd your-project\naletheia init --agents --claude-hooks` },
         {
-          note: "Add the two hooks to .claude/settings.json. Recall then happens on every prompt and costs the agent nothing:",
-          code: `{
-  "hooks": {
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "aletheia hook" }] }],
-    "Stop": [{ "hooks": [{ "type": "command", "command": "aletheia hook" }] }]
-  }
-}`,
+          note: "--claude-hooks merges two hooks into .claude/settings.json and keeps your other settings. Recall then happens on every prompt and costs the agent nothing. Check what an agent would get:",
+          code: `aletheia hook --dry-run "how is this project built"`,
         },
       ],
     },
