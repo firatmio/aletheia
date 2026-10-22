@@ -20,3 +20,9 @@ func TestContentTermsDropsShortNumbersOnly(t *testing.T) {
 		t.Fatalf("got %v want %v", got, want)
 	}
 }
+
+func TestContentTermsDropsProjectWords(t *testing.T) {
+	if got := ContentTerms(Tokenize("how is this project built in the repo")); !reflect.DeepEqual(got, []string{"built"}) {
+		t.Fatalf("got %v", got)
+	}
+}

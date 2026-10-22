@@ -13,6 +13,7 @@ func init() {
 		"function functions method methods file files code value values number numbers call calls time " +
 		"how what where which who why does do did done was were been has have had not no but if there here " +
 		"we you me my our your they them their about just only very more most like need needs want work works " +
+		"project projects repo repos repository codebase " +
 		// Turkish
 		"ve veya ile ama fakat ancak ya da de ki mi mı mu mü bu şu o bunu şunu onu bunlar onlar şey şeyi " +
 		"ben sen biz siz beni bana benden seni sana bizi bize sizi size için gibi kadar daha çok az en hem her hiç " +

@@ -138,7 +138,7 @@ optimizer/fold.go: fold.Visit 15-311, fold 10-13, toFloat 329-335
 builtin/builtin.go: Builtins 35-1081, Index 18
 ```
 
-Files are ranked first, as in Aider's repo map, by how well their path and declaration names match the topic. Hidden, dependency and generated files are skipped. The hook sends a map with the first prompt of a session, sized to the project: none under 25 source files, then 300 or 600 tokens (`--map-budget N` overrides it).
+Files are ranked first, as in Aider's repo map, by how well their path and declaration names match the topic. Hidden, dependency and generated files are skipped. For a question about building, testing or shipping, and for the overview without a topic, the map starts with the build files: `build and CI: go.mod, Makefile, scripts/, .github/workflows/ci.yml`. The hook sends a map with the first prompt of a session, sized to the project: none under 25 source files, then 300 or 600 tokens (`--map-budget N` overrides it).
 </details>
 
 <details>

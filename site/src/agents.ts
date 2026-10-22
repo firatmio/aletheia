@@ -9,6 +9,10 @@
 // code block.
 import { site } from "./content";
 
+// The build date, so an agent that got a cached copy (WebFetch keeps pages
+// for a while) can tell it may be out of date.
+const updated = new Date().toISOString().slice(0, 10);
+
 const status = site.released
   ? ""
   : `Status: pre-release. The repository is private, so \`go install\` asks for GitHub credentials ("could not read Username"). If \`aletheia version\` already works on this machine, setup continues from step 2. Users with access to the repository can install as shown in step 1.\n\n`;
@@ -27,6 +31,8 @@ In PowerShell: \`$env:GOPRIVATE="github.com/firatmio/*"; ${site.install}\`
 
 export function agentsMd(): string {
   return `# Aletheia setup guide for coding agents
+
+Updated ${updated}. Fetch tools may serve an older cached copy; \`curl -fsSL ${site.url}/agents.md\` gets the current text.
 
 Aletheia is memory for coding agents that checks itself against the code. Each memory is a claim plus evidence (anchors) that is re-checked on every recall; stale memories are hidden, and recall points at the exact lines to read.
 
