@@ -131,8 +131,11 @@ Status 2026-10-21 (first pass, details in `docs/dogfood-4.2.md`):
   - plain HTML with no dependencies.
 - **Still to do:**
   - record the demo GIF with VHS in Docker, after R5;
-  - make the social preview PNG (1280×640; GitHub does not take SVG);
-  - deploy the landing page.
+  - make the social preview PNG (1280×640; GitHub does not take SVG).
+- **Landing page (2026-10-22):** `site/`, Vite + Solid with bun, prerendered at build time. All copy is in `site/src/content.ts`; set `released: true` there when the repo goes public.
+  - Deployed with the Vercel CLI to project `aletheia`: https://aletheia-rho-ten.vercel.app.
+  - `aletheia.firattunaarslan.me` is attached; it needs a CNAME `aletheia` → `f9f7168c64c92b2c.vercel-dns-017.com` at Namecheap.
+  - Still to do: the "try it" block (edit a line, watch the memory go stale) and an og:image.
 
 ### 4.5 Token-saving direction (decided with Fırat, 2026-10-21)
 Aletheia has no claim yet. The goal is to **save tokens without losing quality**, because without a clear saving nobody has a reason to use it. Verification (stale memories never reach the agent) stays the differentiator, and the saving is built on top of it.
