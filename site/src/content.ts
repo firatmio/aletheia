@@ -28,7 +28,7 @@ export const hero = {
 // Items with `afterRename` also wait for the rename (a click or `renameAuto`).
 
 export type Seg = readonly [cls: string, text: string];
-export type Mem = { state: "ok" | "stale" | "map"; segs: readonly Seg[]; reason?: string };
+export type Mem = { state: "ok" | "moved" | "stale" | "map"; segs: readonly Seg[]; reason?: string };
 export type Item =
   | { at: number; kind: "prompt"; segs: readonly Seg[]; afterRename?: boolean }
   | { at: number; kind: "line"; segs: readonly Seg[]; afterRename?: boolean }
@@ -42,9 +42,9 @@ export const story = {
   glitch: 0.8,
   acts: [
     { id: "recall", label: "Recall in the prompt", start: 0, caption: "Every prompt starts with what still holds.",
-      source: "replayed from lab run R5, expr-lang/expr task 4 · commands shortened" },
+      source: "based on lab run R5, expr-lang/expr task 4 · commands shortened" },
     { id: "move", label: "The file moves", start: 0.36, caption: "Two weeks later, a file moves.",
-      source: "replayed from lab run R5, expr-lang/expr task 5, after the rename · commands shortened" },
+      source: "based on lab run R5, expr-lang/expr task 5, after the rename, as Aletheia 0.1.0-beta.4 sees it" },
     { id: "map", label: "The map writes itself", start: 0.62, caption: "Nobody wrote this down. The hook did.",
       source: "the map memory as the Stop hook writes it" },
     { id: "forget", label: "Forgetting", start: 0.8, caption: "What still holds stays. The rest is forgotten.", source: "" },
@@ -56,7 +56,7 @@ export const story = {
     { at: 0.05, kind: "box", head: "UserPromptSubmit · aletheia hook", meta: "3 memories · code map · 0 agent turns", mems: [
       { state: "ok", segs: [["", "New builtin: register it in the Builtins slice, validate in validation.go "], ["ptr", "builtin.go:35-1081"]] },
       { state: "ok", segs: [["", "Multi-arg builtins need an arity entry in TestBuiltin_works_with_any "], ["ptr", "builtin_test.go:263"]] },
-      { state: "ok", segs: [["", "go.mod targets go 1.18, so Go's min/max builtins are not available "], ["ptr", "go.mod:3"]] },
+      { state: "ok", segs: [["", "Builtins are registered in builtin/builtin.go "], ["ptr", "builtin.go:35"]] },
     ] },
     { at: 0.18, kind: "line", segs: [["dim", "● "], ["", "Read builtin/builtin.go "], ["ptr", "lines 35–50"], ["dim", " · 15 lines, not 1,081"]] },
     { at: 0.22, kind: "line", segs: [["dim", "● "], ["", "Read builtin/validation.go "], ["ptr", "lines 12–40"]] },
@@ -66,10 +66,10 @@ export const story = {
 
     { at: 0.41, kind: "rename" },
     { at: 0.41, kind: "prompt", afterRename: true, segs: [["", "Add a new builtin function "], ["ptr", "cbrt(x)"], ["", " that returns the cube root of a number as a float."]] },
-    { at: 0.41, kind: "box", afterRename: true, head: "aletheia hook · checked against the files just now", meta: "1 stale memory hidden", mems: [
+    { at: 0.41, kind: "box", afterRename: true, head: "aletheia hook · checked against the files just now", meta: "1 moved · 1 stale hidden", mems: [
+      { state: "moved", segs: [["", "New builtin: register it in the Builtins slice, validate in validation.go "], ["ptr", "registry.go:35-1081"]], reason: "the same code, now in builtin/registry.go" },
       { state: "ok", segs: [["", "Multi-arg builtins need an arity entry in TestBuiltin_works_with_any "], ["ptr", "builtin_test.go:263"]] },
-      { state: "stale", segs: [["", "New builtin: register it in the Builtins slice"]], reason: "builtin/builtin.go: missing · hidden from your agent" },
-      { state: "map", segs: [["", "Builtins "], ["ptr", "builtin/registry.go:35-1081"], ["dim", " · found in the code right now"]] },
+      { state: "stale", segs: [["", "Builtins are registered in builtin/builtin.go"]], reason: "names builtin/builtin.go, which no longer has Builtins · hidden from your agent" },
     ] },
     { at: 0.52, kind: "line", afterRename: true, segs: [["dim", "● "], ["", "Read builtin/registry.go "], ["ptr", "lines 35–50"]] },
     { at: 0.55, kind: "line", afterRename: true, segs: [["dim", "● "], ["", "Edit builtin/registry.go "], ["ok", "+12"]] },
@@ -116,7 +116,7 @@ export const story = {
 export const board = {
   eyebrow: "How it works",
   title: "Every claim is tied to the line that proves it.",
-  sub: "Anchors are checked mechanically on every recall: no model calls, no embeddings, no network.",
+  sub: "Anchors are checked mechanically on every recall: no model calls, no embeddings, no network. When code moves to another file unchanged, its memories follow it as [moved].",
   claims: [
     {
       id: "arity",
@@ -170,14 +170,14 @@ export const proof = {
   eyebrow: "Results",
   title: "Measured, with the method attached.",
   figures: [
-    { value: "−12%", label: "cost per task sequence on expr-lang/expr" },
-    { value: "−60%", label: "code read before the first edit, first task" },
-    { value: "12/12", label: "tasks passed, same as without Aletheia" },
+    { value: "−22%", label: "cost on gohugoio/hugo (233k lines), seven tasks" },
+    { value: "−9%", label: "cost on expr-lang/expr, in two separate runs" },
+    { value: "28/28", label: "sessions passed the hidden tests, as without Aletheia" },
   ],
   notes: [
-    "R3-map on expr-lang/expr: 4 related tasks, 3 runs with and 3 without Aletheia, headless Claude Code (Opus 5.5). Not yet statistically significant.",
-    "The same runs, first task: characters read before the first edit.",
-    "Hidden acceptance tests judged every run; Aletheia did not change the pass rate.",
+    "R6 on Hugo: seven new template functions, each run with and without Aletheia by headless Claude Code (Opus 5.5). Input tokens −38%, turns −31%. One run, and all tasks of one kind.",
+    "R5 and R6 on expr-lang/expr: the same seven tasks, −9% both times; code read before the first edit −48%.",
+    "Hidden acceptance tests and the full test suite judged every session of R6.",
   ],
   caveat: "Small, tidy code saves nothing: +5% on go-chi/chi (R4).",
   methodLink: "Method and raw numbers",
@@ -194,7 +194,7 @@ export const quickstart = {
       id: "agent",
       label: "Let your agent do it",
       blocks: [
-        { note: "Paste this into Claude Code, Cursor or any coding agent:", code: `Help me set up Aletheia in this project. The setup guide is plain text at ${site.url}/agents.md (curl -fsSL gets it exactly).` },
+        { note: "Paste this into Claude Code, Cursor or any coding agent:", code: `Help me set up Aletheia in this project. The setup guide is plain text at ${site.url}/agents.md (curl -fsSL gets it exactly).`, wrap: true },
         { note: "The agent installs and initializes; the one step that changes the agent's own configuration (the hooks) it hands to you as a single command. /llms.txt indexes the guide.", code: "" },
       ],
     },

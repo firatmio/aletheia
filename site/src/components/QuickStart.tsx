@@ -32,7 +32,7 @@ export default function QuickStart() {
                 <p>{b.note}</p>
                 <Show when={b.code}>
                   <div class="snippet">
-                    <pre ref={pre}>{b.code}</pre>
+                    <pre ref={pre} classList={{ wrap: "wrap" in b && !!b.wrap }}>{b.code}</pre>
                     <Copy text={b.code} target={() => pre} />
                   </div>
                 </Show>
