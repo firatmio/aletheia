@@ -111,7 +111,7 @@ The dry run shows what the hook would add: the overall code map and memories, or
 
 - Recall before exploring: \`aletheia recall "<topic>"\`, unless an "Aletheia project memory" block is already in the context.
 - \`(file:12-40)\` is where that code is now: read those lines, not the whole file.
-- \`[ok]\` = checked just now. \`[?]\` = unanchored hint, worth verifying. Stale memories are hidden.
+- \`[ok]\` = checked just now. \`[moved]\` = the same code was found in another file: still true; \`aletheia verify <id> --reseal\` records the new place. \`[?]\` = unanchored hint, worth verifying. Stale memories are hidden.
 - Save durable facts with evidence. Several in one call, one JSON object per line:
 
 \`\`\`bash

@@ -12,11 +12,26 @@ function ThemeToggle() {
   onMount(() => setLight(document.documentElement.dataset.theme === "light"));
   const toggle = () => {
     const next = light() ? "dark" : "light";
-    document.documentElement.dataset.theme = next;
+    const root = document.documentElement;
+    const apply = () => {
+      root.dataset.theme = next;
+      setLight(next === "light");
+    };
     try {
       localStorage.setItem("theme", next);
     } catch {}
-    setLight(next === "light");
+    // A cross-fade where the browser has view transitions, a short colour
+    // transition elsewhere, and none for visitors who prefer less motion.
+    const doc = document as Document & { startViewTransition?: (update: () => void) => unknown };
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      apply();
+    } else if (doc.startViewTransition) {
+      doc.startViewTransition(apply);
+    } else {
+      root.classList.add("theme-fade");
+      apply();
+      setTimeout(() => root.classList.remove("theme-fade"), 400);
+    }
   };
   return (
     <button class="icon-btn" type="button" onClick={toggle} aria-label={light() ? "Switch to dark theme" : "Switch to light theme"}>

@@ -135,8 +135,8 @@ export default function Story() {
                 <span>memories <b>{okVisible()}</b></span>
               </Show>
               <Show when={act() === 1}>
+                <span>moved <b class="ptr">{renamed() ? 1 : 0}</b></span>
                 <span>stale hidden <b class="stale">{renamed() ? 1 : 0}</b></span>
-                <span>memories <b>{renamed() ? 2 : 3}</b></span>
               </Show>
               <Show when={act() >= 2}>
                 <span>agent turns spent on memory <b class="ok">0</b></span>
@@ -182,7 +182,7 @@ export default function Story() {
                         </div>
                         <For each={x().mems}>
                           {(m, j) => {
-                            const keep = () => m.state === "ok" && p() >= story.acts[2].start;
+                            const keep = () => (m.state === "ok" || m.state === "moved") && p() >= story.acts[2].start;
                             return (
                               <div class={`mem is-${m.state}`} classList={{ keep: keep() && g() > 0 }} style={drift(i() * 10 + j(), keep())}>
                                 <span class="tag">{m.state}</span>
