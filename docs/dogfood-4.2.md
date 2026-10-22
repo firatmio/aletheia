@@ -439,3 +439,66 @@ Setup (`lab-runs/r5/`):
 1. Run a second replicate on expr before any README number changes. One run cannot separate −9% from noise.
 2. Make `remember` take several memories in one call, so the gotcha saves cost one turn.
 3. Test on a larger repo, where finding the right place costs more than on expr.
+
+## 11. R6: everything since R5, on expr again and on Hugo, 28 sessions
+Setup (`lab-runs/r6/`):
+- **Binary:** `main` at 9e1c7df. Since R5 it gained:
+  - batch `remember` (`remember -`, `memories`);
+  - the recall fixes B2 and B7 (stopwords in both languages, the capture-template prefix, a 30% relevance floor);
+  - the code map's build line and its own 30% floor;
+  - `init --claude-hooks`, which now sets up the memory arm.
+- **Design:** the same paired design as R4/R5, one replicate per repo, Opus 5.5.
+- **Repos:**
+  - **expr** @4b31df3: the same seven tasks and trap as R5.
+  - **Hugo** @ed22b85: 919 Go files and 233k lines, about 7× expr. Seven template functions across four namespaces: `math.Clamp`, `strings.Reverse`, `hash.CRC32`, `collections.Chunk`, `math.Lerp`, `strings.PadLeft`, `hash.Adler32`.
+    - **Trap:** before T5, `tpl/math/math.go` is renamed to `tpl/math/arith.go`.
+    - **Acceptance tests:** they check the behaviour and that the function is registered as a template function. They were validated against reference implementations of all seven, which also pass `go test ./tpl/...`.
+    - **Fairness:** Hugo ships its own AGENTS.md. The control copy keeps it unchanged, so the only difference between the arms is Aletheia.
+- **Interruptions:** the Hugo batch was interrupted twice, once by a usage limit and once when the session that ran it ended. Each time the half-finished control session was discarded and rerun from a fresh sync; the discarded attempts are not counted.
+- **Result:** 28/28 sessions passed the acceptance tests and the full suite (`./...` for expr, `./tpl/...` for Hugo).
+
+| expr (R6) | Mem | Ctrl | Turns mem/ctrl | Chars before first edit mem/ctrl |
+|---|---|---|---|---|
+| T1 clamp | $0.81 | $0.54 | 39/20 | 14k/26k |
+| T2 sign | $0.59 | $0.58 | 36/24 | 18k/45k |
+| T3 fold clamp | $0.50 | $0.72 | 20/30 | 23k/24k |
+| T4 hypot | $0.39 | $0.57 | 23/25 | 17k/47k |
+| T5 cbrt (after the rename) | $0.61 | $0.57 | 28/25 | 35k/40k |
+| T6 fold sign | $0.29 | $0.34 | 10/8 | 13k/29k |
+| T7 lerp | $0.53 | $0.76 | 27/30 | 24k/63k |
+| **Total** | **$3.72** | **$4.09** | 183/162 | 143k/273k |
+
+| Hugo (R6) | Mem | Ctrl | Turns mem/ctrl | Input tokens mem/ctrl |
+|---|---|---|---|---|
+| T1 math.Clamp | $0.29 | $0.36 | 10/14 | 194k/346k |
+| T2 strings.Reverse | $0.27 | $0.30 | 11/16 | 223k/340k |
+| T3 hash.CRC32 | $0.29 | $0.50 | 14/22 | 267k/541k |
+| T4 collections.Chunk | $0.29 | $0.47 | 9/21 | 239k/486k |
+| T5 math.Lerp (after the rename) | $0.27 | $0.34 | 9/12 | 209k/338k |
+| T6 strings.PadLeft | $0.32 | $0.27 | 12/11 | 290k/258k |
+| T7 hash.Adler32 | $0.27 | $0.34 | 13/17 | 266k/432k |
+| **Total** | **$2.01** | **$2.58** | 78/113 | 1.69M/2.74M |
+
+**Verdict:**
+- **Hugo: 22% cheaper**, with 38% fewer input tokens and 31% fewer turns. Six of the seven tasks were cheaper.
+- **expr: 9% cheaper again.** Across R5 and R6 combined, $7.14 against $7.85.
+
+**expr:**
+- **Two replicates, two versions:** R5 and R6 ran different versions of Aletheia but agree on the cost, −9% each.
+- **Reading:** reading before the first edit was lower in all seven tasks, −48% overall.
+- **Extra turns:** the memory arm took 21 more turns, almost all in T1–T2. Most of them came from the agent fixing its own tests (T1: 39 turns, of which only two were Aletheia calls). That is ordinary task variance, not Aletheia overhead.
+
+**Hugo:**
+- **The larger the repo, the larger the saving, as R3/R4 suggested.** On Hugo the control arm pays for finding the namespace, the registration file and the test conventions on every task. The memory arm gets them from the code map and the captured maps.
+- **The trap behaved as designed.**
+  - **The agent:** in T5, the first task after the rename, the memory arm's first call was `Read tpl/math/arith.go`, where the code map pointed. It finished in 9 turns.
+  - **The stale memory:** a gotcha anchored to `math.go` (`cast.ToFloat64E` turns nil into 0) went stale and was hidden.
+  - **The new memory:** the agent saved one that records the rename.
+
+**Caveats:**
+- **One replicate on Hugo.** The run-to-run spread seen on chi was about 6%.
+- **One kind of change.** All Hugo tasks are the same kind (a new template function). This is where maps help most; a mix of kinds would likely show less.
+
+**What this suggests:**
+1. **README results.** Report expr as −9% over two replicates and Hugo as −22% over one replicate, and say plainly that the tasks are of one kind. A second Hugo replicate, or a task mix, should come before launch.
+2. **Moved symbols.** The hidden gotcha from the trap is still true; only its file moved. A `symbol:` anchor whose declaration moved unchanged to another file could be shown as `[moved]` instead of hidden. Design under discussion: a sealed fingerprint of the declaration, compared on move, and hidden whenever it is ambiguous.
