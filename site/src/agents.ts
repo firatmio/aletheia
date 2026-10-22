@@ -9,9 +9,10 @@
 // code block.
 import { site } from "./content";
 
-// The build date, so an agent that got a cached copy (WebFetch keeps pages
-// for a while) can tell it may be out of date.
-const updated = new Date().toISOString().slice(0, 10);
+// The build time, to the minute, so every deploy has its own stamp and an
+// agent that got a cached copy (WebFetch keeps pages for a while) can tell
+// it from the current one: curl shows the newest stamp.
+const updated = new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC";
 
 const status = site.released
   ? ""
@@ -32,7 +33,7 @@ In PowerShell: \`$env:GOPRIVATE="github.com/firatmio/*"; ${site.install}\`
 export function agentsMd(): string {
   return `# Aletheia setup guide for coding agents
 
-Updated ${updated}. Fetch tools may serve an older cached copy; \`curl -fsSL ${site.url}/agents.md\` gets the current text.
+Build ${updated}. Fetch tools may serve an older cached copy; \`curl -fsSL ${site.url}/agents.md\` gets the current text, so a different stamp there means this copy is old.
 
 Aletheia is memory for coding agents that checks itself against the code. Each memory is a claim plus evidence (anchors) that is re-checked on every recall; stale memories are hidden, and recall points at the exact lines to read.
 

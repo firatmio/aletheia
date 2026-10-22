@@ -219,3 +219,7 @@ The agent moved the old Aletheia files aside, fetched the guide with curl and fo
   - **The memory:** an agent-style memory with only `contains:tpl/math/math.go::af, err := cast\.ToFloat64E\(n\)`.
   - **When saved:** it gained `symbol:tpl/math/math.go::Namespace.Abs@a5964fbf…`.
   - **After `git mv` to `arith.go`:** it comes back as `[moved: tpl/math/math.go → tpl/math/arith.go] … (tpl/math/arith.go:48, tpl/math/arith.go:47-54)`.
+
+**B12, items 1 and 2 done** on branch `fix/launch-notes-b12`.
+- **Build stamp:** the guide now opens with "Build 2026-10-22 19:16 UTC", to the minute and different on every deploy. An agent can tell its copy is cached and stale by comparing it with what curl returns.
+- **Dry-run heading:** without a prompt the map is headed "Code map of the project" instead of "Code map for this prompt".

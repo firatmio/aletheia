@@ -640,7 +640,11 @@ func hookContext(e *engine.Engine, prompt, session string, budget, limit, mapBud
 				mapBudget = m.SuggestedBudget()
 			}
 			if s := m.Render(prompt, mapBudget); mapBudget > 0 && s != "" {
-				parts = append(parts, mapPreamble+s)
+				head := mapPreamble
+				if strings.TrimSpace(prompt) == "" {
+					head = projectMapPreamble // dry run without a prompt: the overview
+				}
+				parts = append(parts, head+s)
 			}
 		}
 	}
@@ -649,6 +653,9 @@ func hookContext(e *engine.Engine, prompt, session string, budget, limit, mapBud
 
 // mapPreamble introduces the code map in the agent's context.
 const mapPreamble = "Code map for this prompt (file: Name lines, computed from the files just now; read those lines, not whole files):\n"
+
+// projectMapPreamble introduces the map when there is no prompt to fit it to.
+const projectMapPreamble = "Code map of the project (file: Name lines, computed from the files just now):\n"
 
 // firstInSession records that what was sent once per session (e.g. the code
 // map) has gone out, and reports whether this is the first time. Without a
