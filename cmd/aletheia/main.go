@@ -4,6 +4,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -40,6 +42,9 @@ Usage:
   aletheia init [dir] [--agents]
   aletheia remember <claim> [--anchor SPEC]... [--body TEXT|-] [--tag T]... [--ttl 30d]
                     [--confidence 0.8] [--supersedes ID]... [--source NAME] [--force]
+  aletheia remember - [--source NAME] [--force]
+                                      several at once: one JSON object per line on stdin,
+                                      {"claim":…,"anchors":[…],"tags":[…],"ttl":…,"supersedes":[…],"body":…}
   aletheia recall [query] [--budget N] [--limit N] [--full] [--stale] [--tag T]
                   [--session ID] [--json]
   aletheia get <id> [--json]
@@ -307,6 +312,9 @@ func (c *cli) remember(args []string) int {
 	if err != nil {
 		return c.usageErr(err)
 	}
+	if len(f.pos) == 1 && f.pos[0] == "-" {
+		return c.rememberBatch(f)
+	}
 	claim := strings.Join(f.pos, " ")
 	if strings.TrimSpace(claim) == "" {
 		return c.usageErr(errors.New("remember needs a claim"))
@@ -329,19 +337,12 @@ func (c *cli) remember(args []string) int {
 			return c.usageErr(errors.New("--confidence: expected a number between 0 and 1"))
 		}
 	}
-	source := f.str("source")
-	if source == "" {
-		source = os.Getenv("ALETHEIA_SOURCE")
-	}
-	if source == "" {
-		source = "cli"
-	}
 	e, err := c.open(f)
 	if err != nil {
 		return c.fail(err)
 	}
 	m, v, err := e.Remember(engine.RememberInput{
-		Claim: claim, Body: body, Source: source, Tags: f.all("tag"), Anchors: f.all("anchor"),
+		Claim: claim, Body: body, Source: rememberSource(f), Tags: f.all("tag"), Anchors: f.all("anchor"),
 		Supersedes: f.all("supersedes"), Confidence: conf, TTL: ttl, Force: f.bools["force"],
 	})
 	if err != nil {
@@ -354,6 +355,53 @@ func (c *cli) remember(args []string) int {
 	}
 	fmt.Fprintln(c.out, engine.RenderSaved(m, v))
 	return exitOK
+}
+
+func rememberSource(f *flagSet) string {
+	if s := f.str("source"); s != "" {
+		return s
+	}
+	if s := os.Getenv("ALETHEIA_SOURCE"); s != "" {
+		return s
+	}
+	return "cli"
+}
+
+// rememberBatch saves one memory per JSON line on stdin, with the same keys
+// as the MCP remember tool, so an agent can save several facts in one call.
+func (c *cli) rememberBatch(f *flagSet) int {
+	for _, n := range []string{"anchor", "body", "tag", "ttl", "confidence", "supersedes"} {
+		if len(f.all(n)) > 0 {
+			return c.usageErr(fmt.Errorf("--%s cannot be used with -: put it in each JSON line", n))
+		}
+	}
+	var raws []json.RawMessage
+	sc := bufio.NewScanner(c.in)
+	sc.Buffer(make([]byte, 0, 64*1024), 4*engine.MaxBodyBytes) // a line holds a body plus the rest
+	for sc.Scan() {
+		if line := bytes.TrimSpace(sc.Bytes()); len(line) > 0 {
+			raws = append(raws, append(json.RawMessage(nil), line...))
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return c.fail(err)
+	}
+	if len(raws) == 0 {
+		return c.usageErr(errors.New(`remember -: expected one JSON object per line on stdin, e.g. {"claim":"…","anchors":["exists:go.mod"]}`))
+	}
+	e, err := c.open(f)
+	if err != nil {
+		return c.fail(err)
+	}
+	r := mcp.RememberBatch(e, raws, rememberSource(f), f.bools["force"])
+	fmt.Fprintln(c.out, r.Text)
+	switch {
+	case r.Saved == len(raws):
+		return exitOK
+	case r.Failed == 0:
+		return exitConflict
+	}
+	return exitFail
 }
 
 func (c *cli) recall(args []string) int {

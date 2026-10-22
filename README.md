@@ -171,6 +171,7 @@ Edit memories by hand, review them in pull requests, grep them. They are just fi
 aletheia init [dir] [--agents]
 aletheia remember <claim> [--anchor SPEC]... [--body TEXT|-] [--tag T]... [--ttl 30d]
                   [--confidence 0.8] [--supersedes ID]... [--source NAME] [--force]
+aletheia remember - [--source NAME] [--force]            # several at once: one JSON object per line on stdin
 aletheia recall [query] [--budget N] [--limit N] [--full] [--stale] [--tag T] [--session ID] [--json]
 aletheia get <id> [--json]
 aletheia verify [id] [--reseal] [--ttl 30d] [--json]   # exits 1 if anything is stale (CI-friendly)
@@ -182,6 +183,17 @@ aletheia serve [--dir DIR]                               # MCP server on stdio
 ```
 
 `remember` exits with code `3` when the claim duplicates or closely matches an existing memory, and names it so the agent can `--supersedes` it instead.
+
+`remember -` saves several memories in one call. Each stdin line is a JSON object with the MCP tool's keys, and each memory is saved on its own:
+
+```bash
+aletheia remember - <<'EOF'
+{"claim": "Builtins are registered in builtin/registry.go", "anchors": ["symbol:builtin/registry.go::Builtins"]}
+{"claim": "go.mod targets Go 1.18", "anchors": ["contains:go.mod::^go 1\\.18$"], "tags": ["toolchain"]}
+EOF
+```
+
+It prints one result per line, in order. It exits `0` when all are saved, `3` when the only failures are conflicts, and `1` otherwise. A regex whose `\\` became `\` on the way through the shell (`1\.18`) is still accepted. The MCP `remember` tool takes the same objects as `memories`.
 </details>
 
 <details>

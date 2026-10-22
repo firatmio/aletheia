@@ -123,6 +123,36 @@ func TestRememberRecallOverMCP(t *testing.T) {
 	}
 }
 
+func TestRememberSeveralOverMCP(t *testing.T) {
+	e := newEngine(t)
+	resp := exchange(t, e,
+		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"remember","arguments":{"memories":[`+
+			`{"claim":"Go version is 1.23","anchors":["contains:go.mod::^go 1\\.23$"]},`+
+			`{"claim":"Go version is 1.23"},`+
+			`{"claim":"Go version is 9","anchors":["contains:go.mod::^go 9$"]}]}}}`,
+		// the array sent as a string, plus a top-level claim: both are saved
+		`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"remember","arguments":{"claim":"Module path is x","anchors":"contains:go.mod::^module x$",`+
+			`"memories":"[{\"claim\":\"Releases are cut from main\",\"ttl\":\"30d\"}]"}}}`,
+		`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"remember","arguments":{"memories":[{"claim":"Go version is 1.23"}]}}}`,
+	)
+	text, isErr := toolText(t, resp[0])
+	lines := strings.Split(text, "\n")
+	if isErr || len(lines) != 3 || !strings.HasPrefix(lines[0], "saved ") ||
+		!strings.HasPrefix(lines[1], "#2 not saved: duplicate") || !strings.HasPrefix(lines[2], "#3 not saved") {
+		t.Fatalf("partial batch should succeed with one line per memory: %q err=%v", text, isErr)
+	}
+
+	text, isErr = toolText(t, resp[1])
+	if isErr || strings.Count(text, "saved ") != 2 || !strings.Contains(text, "Module path is x") ||
+		!strings.Contains(text, "Releases are cut from main") {
+		t.Fatalf("string array plus top-level claim: %q err=%v", text, isErr)
+	}
+
+	if text, isErr = toolText(t, resp[2]); !isErr || !strings.Contains(text, "#1 not saved") {
+		t.Fatalf("a batch with nothing saved is an error: %q", text)
+	}
+}
+
 func TestVerifyAndResealOverMCP(t *testing.T) {
 	e := newEngine(t)
 	m, _, err := e.Remember(engine.RememberInput{Claim: "Module is named x", Anchors: []string{"file:go.mod", "contains:go.mod::module x"}})
