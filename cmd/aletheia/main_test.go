@@ -134,6 +134,52 @@ func TestBodyFromStdinAndJSON(t *testing.T) {
 	}
 }
 
+func TestRememberSeveralFromStdin(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "go.mod", "module x\n\ngo 1.23\n")
+	runCLI(t, dir, "", "init")
+
+	lines := `{"claim": "Go version is 1.23", "anchors": ["contains:go.mod::^go 1\\.23$"], "tags": ["toolchain"]}
+
+{"claim": "Module path is x", "anchors": "contains:go.mod::^module x$", "ttl": "90d"}
+`
+	code, out, errs := runCLI(t, dir, lines, "remember", "-", "--source", "lab")
+	if code != 0 || strings.Count(out, "saved ") != 2 || strings.Count(out, "[ok]") != 2 {
+		t.Fatalf("remember -: %d %q %q", code, out, errs)
+	}
+	id := strings.Fields(out)[1]
+	_, out, _ = runCLI(t, dir, "", "get", id)
+	if !strings.Contains(out, "source lab") || !strings.Contains(out, "tags: toolchain") {
+		t.Fatalf("source or tags not recorded: %q", out)
+	}
+
+	code, out, _ = runCLI(t, dir, `{"claim": "Go version is 1.23"}`+"\n", "remember", "-")
+	if code != exitConflict || !strings.Contains(out, "#1 not saved: duplicate") {
+		t.Fatalf("only conflicts should exit %d: %d %q", exitConflict, code, out)
+	}
+
+	// a regex whose \\ was collapsed to \ by the shell still parses
+	code, out, _ = runCLI(t, dir, `{"claim": "Go directive names 1.23", "anchors": ["contains:go.mod::^go 1\.23$"], "force": true}`+"\n", "remember", "-")
+	if code != 0 || !strings.Contains(out, "[ok] Go directive names 1.23") {
+		t.Fatalf("lone backslash escape: %d %q", code, out)
+	}
+
+	// a bad line is reported by number and does not stop the others
+	code, out, _ = runCLI(t, dir, "{not json\n"+`{"claim": "Releases are cut from main", "ttl": "30d"}`+"\n", "remember", "-")
+	if code != exitFail || !strings.Contains(out, "#1 not saved") || !strings.Contains(out, "saved ") ||
+		!strings.Contains(out, "Releases are cut from main") {
+		t.Fatalf("mixed batch: %d %q", code, out)
+	}
+
+	if code, _, errs = runCLI(t, dir, "", "remember", "-"); code != exitUsage || !strings.Contains(errs, "JSON object per line") {
+		t.Fatalf("empty stdin should be a usage error: %d %q", code, errs)
+	}
+	if code, _, errs = runCLI(t, dir, `{"claim": "Tagged elsewhere"}`, "remember", "-", "--tag", "x"); code != exitUsage ||
+		!strings.Contains(errs, "--tag cannot be used with -") {
+		t.Fatalf("per-memory flags with - should be a usage error: %d %q", code, errs)
+	}
+}
+
 func TestUsageErrors(t *testing.T) {
 	dir := t.TempDir()
 	runCLI(t, dir, "", "init")

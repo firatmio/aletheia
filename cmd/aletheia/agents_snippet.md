@@ -5,6 +5,7 @@
 - `[ok]` = checked against the files just now. `[?]` = unanchored hint, verify before relying on it. `(file:12-40)` = where that code is right now: read those lines instead of the whole file. Stale memories are hidden: re-check them, then `aletheia verify <id> --reseal` or `aletheia remember "<new claim>" --supersedes <id>`.
 - After learning a durable fact, save it with evidence: `aletheia remember "<claim>" --anchor symbol:<path>::<Name>` or `--anchor contains:<path>::<regex>`.
   - One fact per memory; split "X and Y" into two.
+  - Several facts: save them in one call, `aletheia remember -` with one JSON object per line on stdin (`{"claim":"…","anchors":["symbol:…"]}`), or `memories` in the MCP tool.
   - Use `symbol:` (function, `Type.Method`, type, var, const) when the claim is about one declaration; otherwise anchor the line that proves the claim with `contains:`, not a comment, a name or a nearby line.
   - Avoid `file:` anchors on files that change often; any edit stales them.
   - A claim that something is absent ("no auth", "no lock") cannot be proven: save it without anchors and with `--ttl 30d`.
