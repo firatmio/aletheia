@@ -387,3 +387,55 @@ Setup (`lab-runs/r4/`):
 1. Make writing cheaper: several memories in one call (e.g. `remember` taking JSON lines on stdin), so the end-of-task save is one turn instead of 2–3.
 2. Write only when it pays. Skip the map memory when the change touched one small, obvious area. Possibly let the snippet say "save a map only if finding the place took more than a couple of searches".
 3. Position honestly: for mid-size and larger codebases, not for small packages.
+
+## 10. R5: Stop-hook capture on chi and expr, paired design, 28 sessions
+Setup (`lab-runs/r5/`):
+- **Same paired design as R4**, run on both repos: chi @9f8adb1 and expr @4b31df3, seven tasks each, one replicate, Opus 5.5.
+- **Memory arm:** prompt hook, code map, MCP, and now the **Stop hook**. After each task it records the edited files as a map memory (`source: aletheia-capture`), and the snippet no longer asks the agent to write maps.
+- **expr tasks:**
+  - builtins ×5: `clamp`, `sign`, `hypot`, `cbrt`, `lerp`;
+  - optimizer folds ×2: `clamp`, `sign`;
+  - **trap** before T5: `builtin/builtin.go` is renamed to `builtin/registry.go`.
+- **chi tasks:** the same as R4.
+- **Result:** 28/28 sessions passed the acceptance tests. One control session (expr T7) failed `TestBuiltin` in the full suite. That test passed 3 times when re-run on the same code, so we count it as flaky.
+
+| chi | Mem | Ctrl | Turns mem/ctrl | Chars before first edit mem/ctrl |
+|---|---|---|---|---|
+| T1 RequireHeader | $0.30 | $0.29 | 14/9 | 10k/13k |
+| T2 NoIndex | $0.24 | $0.26 | 10/13 | 12k/13k |
+| T3 URLParamInt | $0.29 | $0.28 | 14/13 | 3k/7k |
+| T4 MaxURLLength | $0.28 | $0.37 | 10/11 | 12k/21k |
+| T5 CanonicalHost (after the trap) | $0.34 | $0.39 | 11/10 | 13k/24k |
+| T6 URLParamBool | $0.23 | $0.23 | 8/9 | 6k/9k |
+| T7 ServerTiming | $0.48 | $0.45 | 15/14 | 25k/22k |
+| **Total** | **$2.16** | **$2.28** | 82/79 | 80k/109k |
+
+| expr | Mem | Ctrl | Turns mem/ctrl | Chars before first edit mem/ctrl |
+|---|---|---|---|---|
+| T1 clamp | $0.65 | $0.64 | 34/30 | 34k/30k |
+| T2 sign | $0.66 | $0.71 | 31/27 | 28k/48k |
+| T3 fold clamp | $0.50 | $0.43 | 20/13 | 14k/21k |
+| T4 hypot | $0.38 | $0.62 | 17/26 | 21k/52k |
+| T5 cbrt (after the rename) | $0.48 | $0.50 | 23/20 | 32k/40k |
+| T6 fold sign | $0.31 | $0.33 | 13/9 | 10k/23k |
+| T7 lerp | $0.44 | $0.54 | 24/27 | 25k/26k |
+| **Total** | **$3.42** | **$3.76** | 162/152 | 163k/240k |
+
+**Verdict: the write overhead on chi is gone; expr is 9% cheaper.**
+- **chi:**
+  - Cost went from +5% in R4 to −5%. Extra turns dropped from +9 to +3.
+  - Reading before the first edit was 27% lower.
+  - Caveat: the two chi control runs (R4 $2.14, R5 $2.28) differ by 6% on identical tasks. Read this as break-even, not a saving.
+- **expr:**
+  - Cost −9%, input tokens −16%, reading before the first edit −32%.
+  - The memory arm still took 10 more turns, but its turns were cheaper because it carried less read context.
+  - Most of the saving is T4. That is the third builtin of the same kind, and the map from the earlier builtin tasks was already there. Without T4 the difference is −3%.
+- **Capture worked as designed:**
+  - Each repo ended with two map memories, one per kind of change: middleware and URL params on chi, builtins and optimizer on expr. Each map replaced the earlier one for its kind.
+  - After the expr rename no memory went stale, and the next captured map names `builtin/registry.go`.
+- **Agents still save gotchas:** 6 `remember` calls on chi, 5 on expr. Most of the remaining extra turns are these. This run does not show whether those gotchas prevented any mistakes: the control arm never failed on what they describe.
+
+**Next:**
+1. Run a second replicate on expr before any README number changes. One run cannot separate −9% from noise.
+2. Make `remember` take several memories in one call, so the gotcha saves cost one turn.
+3. Test on a larger repo, where finding the right place costs more than on expr.

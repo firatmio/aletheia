@@ -178,7 +178,8 @@ func toolDefs() []map[string]any {
 		},
 		{
 			"name": "remember",
-			"description": "Save one durable fact (one per call) with evidence. anchors: symbol:store.go::Store.Get " +
+			"description": "Save a durable fact with evidence; several in one call: memories=[{claim,anchors,...}]. " +
+				"anchors: symbol:store.go::Store.Get " +
 				"(a declaration), contains:go.mod::go 1\\.23 " +
 				"(regex on the line that proves the claim, not a comment or name), exists:src/auth, " +
 				"file:go.mod (content hash; any edit stales it, avoid on busy files). Anchors must hold now. " +
@@ -187,7 +188,8 @@ func toolDefs() []map[string]any {
 			"inputSchema": obj(map[string]any{
 				"claim": str, "anchors": strs, "body": str, "tags": strs, "ttl": str,
 				"supersedes": strs, "force": flag, "confidence": num,
-			}, "claim"),
+				"memories": map[string]any{"type": "array", "items": map[string]any{"type": "object"}},
+			}),
 		},
 		{
 			"name":        "get",
@@ -321,30 +323,33 @@ func (s *Server) callTool(params json.RawMessage) (map[string]any, *rpcError) {
 
 	case "remember":
 		var a struct {
-			Claim      string    `json:"claim"`
-			Body       string    `json:"body"`
-			Tags       strList   `json:"tags"`
-			Anchors    strList   `json:"anchors"`
-			TTL        string    `json:"ttl"`
-			Supersedes strList   `json:"supersedes"`
-			Force      flexBool  `json:"force"`
-			Confidence flexFloat `json:"confidence"`
+			rememberArgs
+			Memories memList `json:"memories"`
 		}
 		if err := json.Unmarshal(args, &a); err != nil {
-			return fail(err)
-		}
-		ttl, err := engine.ParseTTL(a.TTL)
-		if err != nil {
 			return fail(err)
 		}
 		source := s.client
 		if source == "" {
 			source = "mcp"
 		}
-		m, v, err := s.Engine.Remember(engine.RememberInput{
-			Claim: a.Claim, Body: a.Body, Source: source, Tags: a.Tags, Anchors: a.Anchors,
-			Supersedes: a.Supersedes, Confidence: float64(a.Confidence), TTL: ttl, Force: bool(a.Force),
-		})
+		if len(a.Memories) > 0 {
+			raws := []json.RawMessage(a.Memories)
+			if strings.TrimSpace(a.Claim) != "" { // a top-level claim is one more memory
+				top, err := json.Marshal(a.rememberArgs)
+				if err != nil {
+					return fail(err)
+				}
+				raws = append([]json.RawMessage{top}, raws...)
+			}
+			r := RememberBatch(s.Engine, raws, source, false)
+			return textResult(r.Text, r.Saved == 0), nil
+		}
+		in, err := a.input(source)
+		if err != nil {
+			return fail(err)
+		}
+		m, v, err := s.Engine.Remember(in)
 		if err != nil {
 			var ce *engine.ConflictError
 			if errors.As(err, &ce) {
