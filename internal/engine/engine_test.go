@@ -199,6 +199,19 @@ func TestRecallDropsWeakMatches(t *testing.T) {
 	}
 }
 
+func TestRecallIgnoresTurkishFillerAndShortNumbers(t *testing.T) {
+	v := newEnv(t)
+	v.remember(t, RememberInput{Claim: "MCP server accepts protocol versions 2024-11-05 and 2025-06-18"})
+	v.remember(t, RememberInput{Claim: capturePrefix + `"bu benden izin istiyor ama ben izin veriyorum" changed docs/notes.md`, Source: CaptureSource})
+	res, _ := v.e.Recall(RecallOptions{Query: "#10 u merge ettim ama #11 hala duruyor haber olsun, gerekirse dersin bana."})
+	if len(res.Hits) != 0 {
+		t.Fatalf("Turkish filler and short numbers must not match, got %+v", res.Hits)
+	}
+	if res, _ = v.e.Recall(RecallOptions{Query: "MCP protokol sürümü 2024"}); len(res.Hits) != 1 {
+		t.Fatalf("a topical Turkish query should still find the MCP memory, got %+v", res.Hits)
+	}
+}
+
 func TestCapturedMapTemplateIsNotIndexed(t *testing.T) {
 	v := newEnv(t)
 	v.remember(t, RememberInput{Claim: capturePrefix + `"Add lerp" changed builtin/lib.go`, Source: CaptureSource})
