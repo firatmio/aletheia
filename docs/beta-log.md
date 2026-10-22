@@ -64,3 +64,18 @@ At the end of each week, also log `aletheia verify` and `aletheia stats`.
 - **Weak matches:** a new relevance floor at 30% of the best match drops them.
 
 On this repo's store the B2 query now returns nothing; there is no capture memory. "how is recall ranked" returns the two ranking memories.
+
+## 2026-10-22: after the B2 fix (0.1.0-beta.2)
+
+**B7 · recall · Turkish prompts and short numbers.**
+- **What happened:** the prompt was "#10 u merge ettim ama #11 hala duruyor haber olsun, eğer onun da merge edilmesi gerekirse dersin bana."
+- **What the hook recalled:**
+  - three maps captured from earlier Turkish prompts, which matched on Turkish function words ("bu", "ben", "ama", "olacak");
+  - an MCP memory, because "#11" matched the protocol version "2024-11-05".
+  
+  Most prompts in this repo are Turkish, so in our own use this was a bigger source of noise than B2.
+- **Follow-up:** fixed on branch `fix/recall-turkish-stopwords`. The stopword list gains Turkish function words and prompt filler, and numbers of one or two digits are no longer query terms. Years and ports still are.
+- **Result:**
+  - the same prompt recalls nothing;
+  - "Siteyi vercel cli ile yayınlarsın" still finds the site map;
+  - "recall nasıl sıralanıyor" finds the ranking memories, the same as "how is recall ranked".
