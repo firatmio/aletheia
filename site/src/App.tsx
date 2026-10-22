@@ -1,28 +1,26 @@
 import { createSignal, For, onMount, Show } from "solid-js";
+import Board from "./components/Board";
 import Copy from "./components/Copy";
 import Mark from "./components/Mark";
 import QuickStart from "./components/QuickStart";
-import RecallDemo from "./components/RecallDemo";
-import { footer, hero, how, problem, proof, quickstart, site } from "./content";
+import Story from "./components/Story";
+import { footer, hero, proof, quickstart, site } from "./content";
 
+// Dark is the default; the toggle stores the visitor's choice.
 function ThemeToggle() {
-  const [dark, setDark] = createSignal(false);
-  const effective = () => {
-    const t = document.documentElement.dataset.theme;
-    return t ? t === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
-  };
-  onMount(() => setDark(effective()));
+  const [light, setLight] = createSignal(false);
+  onMount(() => setLight(document.documentElement.dataset.theme === "light"));
   const toggle = () => {
-    const next = effective() ? "light" : "dark";
+    const next = light() ? "dark" : "light";
     document.documentElement.dataset.theme = next;
     try {
       localStorage.setItem("theme", next);
     } catch {}
-    setDark(next === "dark");
+    setLight(next === "light");
   };
   return (
-    <button class="icon-btn" type="button" onClick={toggle} aria-label={dark() ? "Switch to light theme" : "Switch to dark theme"}>
-      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+    <button class="icon-btn" type="button" onClick={toggle} aria-label={light() ? "Switch to dark theme" : "Switch to light theme"}>
+      <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2" />
         <path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" />
       </svg>
@@ -34,18 +32,19 @@ export default function App() {
   let cmd: HTMLElement | undefined;
   return (
     <>
-      <header class="wrap">
-        <nav aria-label="Main">
+      <header class="top">
+        <nav class="wrap nav" aria-label="Main">
           <a class="brand" href="#top" aria-label="Aletheia home">
-            <Mark size={34} />
+            <Mark size={30} drop />
             <span class="wordmark">aletheia</span>
           </a>
           <div class="navlinks">
-            <a href="#how" class="hide-sm">How it works</a>
+            <a href="#board" class="hide-sm">How it works</a>
             <a href="#results" class="hide-sm">Results</a>
             <a href="#start">Quick start</a>
-            <Show when={site.released}>
-              <a class="btn" href={site.repo}>GitHub</a>
+            <a href="/agents.md" class="hide-sm">For agents</a>
+            <Show when={site.released} fallback={<span class="pill">GitHub · soon</span>}>
+              <a class="pill" href={site.repo}>GitHub</a>
             </Show>
             <ThemeToggle />
           </div>
@@ -53,117 +52,68 @@ export default function App() {
       </header>
 
       <main id="top">
-        <section class="wrap hero">
-          <div>
-            <div class="eyebrow">{hero.eyebrow}</div>
-            <h1>
-              {hero.title[0]}
-              <em>{hero.title[1]}</em>
-            </h1>
-            <p class="lede">{hero.lede}</p>
+        <section class="hero wrap">
+          <span class="eyebrow">{hero.eyebrow}</span>
+          <h1>
+            {hero.title[0]}
+            <br />
+            {hero.title[1]}
+            <em>{hero.title[2]}</em>
+          </h1>
+          <p class="lede">{hero.lede}</p>
+          <div class="hero-actions">
             <div class="install">
               <code ref={cmd}>
-                <span class="prompt">$</span> {site.install}
+                <span class="dim">$ </span>
+                {site.install}
               </code>
               <Copy text={site.install} target={() => cmd} />
             </div>
-            <Show when={!site.released}>
-              <p class="soon">{hero.notReleased}</p>
-            </Show>
-            <div class="ctas">
-              <a class="btn solid" href="#start">Set up with Claude Code</a>
-              <a class="btn" href="#results">See the results</a>
-            </div>
+            <a class="btn solid" href="#story">
+              {hero.cta} ↓
+            </a>
           </div>
-          <RecallDemo />
+          <Show when={!site.released}>
+            <p class="soon">{hero.notReleased}</p>
+          </Show>
+          <p class="cue">{hero.cue}</p>
         </section>
 
-        <section class="proof" id="results" aria-label="Measured results">
-          <div class="wrap">
-            <For each={proof.figures}>
-              {(f) => (
-                <div class="fig">
-                  {f.value}
-                  <small>{f.label}</small>
-                </div>
-              )}
-            </For>
-            <p class="fine fine-col">
-              {proof.note}{" "}
-              <Show when={site.released} fallback={proof.methodSoon}>
-                <a href={site.method}>{proof.methodLink}</a>
+        <div id="story">
+          <Story />
+        </div>
+
+        <Board />
+
+        <section class="wrap section" id="results">
+          <span class="eyebrow">{proof.eyebrow}</span>
+          <h2>{proof.title}</h2>
+          <div class="results">
+            <div class="figs">
+              <For each={proof.figures}>
+                {(f, i) => (
+                  <div class="fig">
+                    <span class="fig-value">
+                      {f.value}
+                      <a class="fn" href={`#fn-${i() + 1}`} aria-label={`Note ${i() + 1}`}>
+                        {i() + 1}
+                      </a>
+                    </span>
+                    <span class="fig-label">{f.label}</span>
+                  </div>
+                )}
+              </For>
+            </div>
+            <aside class="notes">
+              <ol>
+                <For each={proof.notes}>{(n, i) => <li id={`fn-${i() + 1}`}>{n}</li>}</For>
+              </ol>
+              <p>{proof.caveat}</p>
+              <Show when={site.released} fallback={<p class="dim">{proof.methodSoon}</p>}>
+                <a href={site.method}>{proof.methodLink} →</a>
               </Show>
-            </p>
+            </aside>
           </div>
-        </section>
-
-        <section class="wrap section">
-          <h2>{problem.title}</h2>
-          <p class="sub">{problem.text}</p>
-          <div class="compare">
-            <div class="card">
-              <span class="label">{problem.naive.label}</span>
-              <div class="rows">
-                <For each={problem.naive.rows}>
-                  {(r) => (
-                    <div class="row">
-                      <span class="score">{r.score}</span>
-                      <span>{r.claim}</span>
-                    </div>
-                  )}
-                </For>
-              </div>
-              <p class="verdict warn">{problem.naive.verdict}</p>
-            </div>
-            <div class="card">
-              <span class="label">{problem.verified.label}</span>
-              <div class="rows">
-                <For each={problem.verified.rows}>
-                  {(r) => (
-                    <div class="row">
-                      <span class="tag ok">{r.state}</span>
-                      <span>
-                        {r.claim} <span class="ptr">{r.ptr}</span>
-                      </span>
-                    </div>
-                  )}
-                </For>
-                <div class="row dim">{problem.verified.footer}</div>
-              </div>
-              <p class="verdict good">{problem.verified.verdict}</p>
-            </div>
-          </div>
-        </section>
-
-        <section class="wrap section" id="how">
-          <h2>{how.title}</h2>
-          <ol class="steps">
-            <For each={how.steps}>
-              {(s, i) => (
-                <li>
-                  <span class="num">{i() + 1}</span>
-                  <h3>{s.title}</h3>
-                  <p>{s.text}</p>
-                </li>
-              )}
-            </For>
-          </ol>
-          <h3 class="label anchors-title">{how.anchorsTitle}</h3>
-          <dl class="anchors">
-            <For each={how.anchors}>
-              {(a) => (
-                <div>
-                  <dt>
-                    <code>{a.kind}:</code>
-                  </dt>
-                  <dd>
-                    holds while {a.holds}
-                    <code class="example">{a.example}</code>
-                  </dd>
-                </div>
-              )}
-            </For>
-          </dl>
         </section>
 
         <section class="wrap section" id="start">
@@ -176,6 +126,9 @@ export default function App() {
       <footer>
         <div class="wrap foot">
           <span>{footer.left}</span>
+          <span>
+            {footer.agents} <a href="/agents.md">/agents.md</a> · <a href="/llms.txt">/llms.txt</a>
+          </span>
           <span>{footer.right}</span>
         </div>
       </footer>
