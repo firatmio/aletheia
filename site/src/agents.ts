@@ -55,10 +55,13 @@ ${site.install}
 \`\`\`
 
 Go 1.24 or newer.
-${privateInstall} To upgrade, run \`go install\` again. On Windows a running agent keeps \`aletheia.exe\` open; renaming the old file first avoids "file in use":
+${privateInstall}
+To upgrade, run \`go install\` again. On Windows a running agent keeps \`aletheia.exe\` open, so move it aside first. This works every time: old copies that are no longer in use are removed, and the new name never collides with one that still is:
 
 \`\`\`powershell
-Rename-Item "$(go env GOPATH)\\bin\\aletheia.exe" aletheia-old.exe
+$bin = "$(go env GOPATH)\\bin"
+Remove-Item "$bin\\aletheia-old*.exe" -ErrorAction SilentlyContinue
+Rename-Item "$bin\\aletheia.exe" "aletheia-old-$(Get-Random).exe"
 \`\`\`
 
 ## 2. Set up the project

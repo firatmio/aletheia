@@ -128,8 +128,8 @@ func TestBuildFilesAnswerBuildQuestions(t *testing.T) {
 	m, _ := Build(root)
 
 	out := m.Render("how is this project built", 300)
-	if !strings.HasPrefix(out, "build and CI: ") {
-		t.Fatalf("a build question should lead with the build files:\n%s", out)
+	if !strings.HasPrefix(out, "build and CI: ") || strings.Contains(out, "\n") {
+		t.Fatalf("a question only about building is answered by the build line alone:\n%s", out)
 	}
 	for _, f := range []string{"go.mod", "Makefile", "scripts/", ".github/workflows/ci.yml"} {
 		if !strings.Contains(out, f) {
@@ -144,5 +144,23 @@ func TestBuildFilesAnswerBuildQuestions(t *testing.T) {
 	}
 	if out := m.Render("add a builtin function", 300); strings.Contains(out, "build and CI") {
 		t.Fatalf("a code question should not get the build line:\n%s", out)
+	}
+}
+
+func TestRenderDropsWeakFiles(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "auth/login.go", "package auth\n\nfunc Login() {}\n\nfunc LoginHandler() {}\n\nfunc LoginForm() {}\n")
+	var doc strings.Builder
+	for i := 0; i < 30; i++ {
+		doc.WriteString(" cache queue retry metrics")
+	}
+	write(t, root, "misc/util.go", "package misc\n\n// Helpers for login and"+doc.String()+".\nfunc Helpers() {}\n")
+	for _, f := range []string{"db/open.go", "db/close.go", "web/serve.go"} {
+		write(t, root, f, "package x\n\nfunc Run() {}\n")
+	}
+	m, _ := Build(root)
+	out := m.Render("login", 300)
+	if !strings.Contains(out, "auth/login.go") || strings.Contains(out, "misc/util.go") {
+		t.Fatalf("a file that only mentions the topic in passing should fall below the floor:\n%s", out)
 	}
 }

@@ -79,14 +79,17 @@ An agent can also do the rest of the setup from the [agent guide](https://alethe
 Memories live in `.aletheia/memories/*.md` as plain Markdown. Commit them and your team, and every agent, shares one memory that verifies itself on each machine.
 
 **Upgrading:** run the same `go install` again.
-- **On Windows,** a running agent keeps `aletheia.exe` open through the MCP server, so the install fails with "file in use". Quit the agent first, or rename the old binary and install. Windows allows renaming a running exe:
-
-  ```powershell
-  Rename-Item "$(go env GOPATH)\bin\aletheia.exe" aletheia-old.exe
-  go install github.com/firatmio/aletheia/cmd/aletheia@latest
-  ```
-
+- **On Windows,** a running agent keeps `aletheia.exe` open through the MCP server, so the install fails with "file in use". Quit the agent first, or move the old binary aside and install. Windows allows renaming a running exe.
 - **Which version runs:** the hooks use the new binary right away. The MCP server keeps the old one until the agent restarts.
+
+The Windows command works on every upgrade. It removes old copies that are no longer in use, and the random name never collides with one that is still running:
+
+```powershell
+$bin = "$(go env GOPATH)\bin"
+Remove-Item "$bin\aletheia-old*.exe" -ErrorAction SilentlyContinue
+Rename-Item "$bin\aletheia.exe" "aletheia-old-$(Get-Random).exe"
+go install github.com/firatmio/aletheia/cmd/aletheia@latest
+```
 
 ## Results
 
