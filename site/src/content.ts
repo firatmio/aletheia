@@ -194,7 +194,7 @@ export const quickstart = {
       id: "agent",
       label: "Let your agent do it",
       blocks: [
-        { note: "Paste this into Claude Code, Cursor or any coding agent:", code: `Help me set up Aletheia in this project. The setup guide is plain text at ${site.url}/agents.md` },
+        { note: "Paste this into Claude Code, Cursor or any coding agent:", code: `Help me set up Aletheia in this project. The setup guide is plain text at ${site.url}/agents.md (curl -fsSL gets it exactly).` },
         { note: "The agent installs and initializes; the one step that changes the agent's own configuration (the hooks) it hands to you as a single command. /llms.txt indexes the guide.", code: "" },
       ],
     },
@@ -205,7 +205,7 @@ export const quickstart = {
         { note: "Install and set up the project:", code: `${site.install}\ncd your-project\naletheia init --agents --claude-hooks` },
         {
           note: "--claude-hooks merges two hooks into .claude/settings.json and keeps your other settings. Recall then happens on every prompt and costs the agent nothing. Check what an agent would get:",
-          code: `aletheia hook --dry-run "how is this project built"`,
+          code: `aletheia hook --dry-run`,
         },
       ],
     },

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -330,6 +331,42 @@ func TestHookDryRunChangesNothing(t *testing.T) {
 	}
 	if _, out, _ := runCLI(t, dir, "", "hook", "--dry-run", "unrelated words only"); !strings.Contains(out, "nothing would be added") {
 		t.Fatalf("an empty result should say so: %q", out)
+	}
+}
+
+func TestVersionNamesTheSourceBuild(t *testing.T) {
+	if got := formatVersion("0.1.0", "v0.0.0-20261022130735-0d57de42de32"); got != "0.1.0 (v0.0.0-20261022130735-0d57de42de32)" {
+		t.Fatalf("a build from source should say which commit: %q", got)
+	}
+	for _, module := range []string{"", "(devel)", "v0.1.0"} {
+		if got := formatVersion("0.1.0", module); got != "0.1.0" {
+			t.Fatalf("module %q: got %q", module, got)
+		}
+	}
+}
+
+func TestInitAgentsNotesGitIgnoredFiles(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	dir := t.TempDir()
+	if out, err := exec.Command("git", "-C", dir, "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v %s", err, out)
+	}
+	writeFile(t, dir, ".gitignore", "CLAUDE.md\n")
+	_, out, _ := runCLI(t, dir, "", "init", "--agents")
+	if !strings.Contains(out, "git ignores CLAUDE.md here") || strings.Contains(out, "git ignores AGENTS.md") {
+		t.Fatalf("init should say which instruction file git ignores: %q", out)
+	}
+}
+
+func TestHookDryRunWithoutPromptShowsMemories(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "go.mod", "module x\n\ngo 1.23\n")
+	runCLI(t, dir, "", "init")
+	runCLI(t, dir, "", "remember", "The module targets Go 1.23", "--anchor", `contains:go.mod::^go 1\.23$`)
+	if code, out, _ := runCLI(t, dir, "", "hook", "--dry-run"); code != 0 || !strings.Contains(out, "[ok] The module targets Go 1.23") {
+		t.Fatalf("dry run without a prompt: %d %q", code, out)
 	}
 }
 

@@ -109,3 +109,29 @@ Fırat asked a Claude Code session in another project to set Aletheia up from `/
   - the dry-run check;
   - that the code map works from the first prompt.
 - **Not done:** a separate bootstrap scan for the cold start. The code map already gives value from the first prompt; the `init` output now says so.
+
+## 2026-10-22: the second agent setup, after B8
+
+A new session in the same project followed the new guide.
+- **What went right:**
+  - It did steps 1, 2 and 4.
+  - It handed step 3 (`init --claude-hooks`) to Fırat without touching its own hooks.
+  - It committed nothing.
+- **Install:** it installed `main` from GitHub with Fırat's `gh` credentials and `GOPRIVATE`, after renaming the old exe as the Windows note says.
+
+**B9 · friction · five smaller problems.**
+1. **Private install:** `go install` without credentials fails with a misleading error. Go resolves a pseudo-version from GitHub, then says "could not read Username". The guide said it would fail but gave no recipe.
+2. **WebFetch:** it still summarized the guide and dropped the hook JSON and command details. The agent fetched the exact text with curl.
+3. **Ignored instruction file:** CLAUDE.md is git-ignored in that project. `init` said it added the note there, but the note never reaches git.
+4. **Next steps:** beta.3 did not print them. 0.1.0 from `main` does (B8). No action.
+5. **Dry-run example:** for "how is this project built" on an empty store, the code map showed unrelated files, matched on "run" and similar. Build files (go.mod, CI config) are not in the code map at all, since it indexes declarations. A weak first impression.
+
+**Fixed on branch `fix/setup-feedback`:**
+- **Guide:**
+  - It opens with the whole setup in four commands, so a summary keeps them.
+  - It gives the pre-release install recipe for users with access: `GOPRIVATE` plus `gh auth setup-git`, with the note that this changes the user's git config.
+  - The quick-start prompt says `curl -fsSL` gets the exact text.
+- **`init --agents`:** says when git ignores CLAUDE.md or AGENTS.md ("the note stays on this machine").
+- **Dry-run example:** examples use `aletheia hook --dry-run` without a prompt, which shows the overall code map and memories. Help also shows one prompt example.
+- **`aletheia version`:** for a build from source it adds the module version Go recorded, e.g. `0.1.0 (v0.0.0-20261022130735-0d57de42de32)`, so the commit is known.
+- **Not done:** indexing build and CI files in the code map. Worth a look once the map is measured again.
