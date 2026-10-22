@@ -39,6 +39,9 @@ const (
 	Verified     Freshness = "verified"     // every anchor holds against the files
 	Unverifiable Freshness = "unverifiable" // no anchors: a hint, not a fact
 	Stale        Freshness = "stale"        // an anchor failed or the memory expired
+	// Moved: every anchor holds, but a sealed symbol's declaration was found
+	// unchanged in another file. verify --reseal records the new place.
+	Moved Freshness = "moved"
 )
 
 // Verdict is the result of judging one memory.
@@ -65,32 +68,76 @@ func (e *Engine) now() time.Time { return e.Now().UTC().Truncate(time.Second) }
 // Judge checks a memory's anchors against the project right now. It reads
 // files only; it never runs anything.
 func (e *Engine) Judge(m *store.Memory) Verdict {
-	v := Verdict{Freshness: Verified}
-	if len(m.Anchors) == 0 {
-		v.Freshness = Unverifiable
+	return e.judge(m, &goScan{root: e.Store.Root})
+}
+
+// goScan lists the project's Go files at most once per operation, and only
+// when a sealed symbol anchor needs relocating.
+type goScan struct {
+	root  string
+	files *anchor.Files
+}
+
+func (s *goScan) list() *anchor.Files {
+	if s.files == nil {
+		s.files = anchor.GoFiles(s.root)
 	}
+	return s.files
+}
+
+func (e *Engine) judge(m *store.Memory, scan *goScan) Verdict {
+	var v Verdict
+	var stale, bad, moved bool
+	var movedReasons []string
 	for _, raw := range m.Anchors {
 		a, err := anchor.Parse(raw)
 		if err != nil {
 			v.Reasons = append(v.Reasons, "bad anchor")
-			if v.Freshness == Verified {
-				v.Freshness = Unverifiable
-			}
+			bad = true
 			continue
 		}
 		r := anchor.Check(e.Store.Root, a)
-		if !r.OK {
-			v.Reasons = append(v.Reasons, r.Detail)
-			v.Freshness = Stale
-		} else if r.Line > 0 {
-			v.Pointers = append(v.Pointers, pointer(a.Path, r.Line, r.EndLine))
+		if r.OK {
+			if r.Line > 0 {
+				v.Pointers = append(v.Pointers, pointer(a.Path, r.Line, r.EndLine))
+			}
+			continue
 		}
+		// A sealed symbol may have moved, unchanged, to another file. That
+		// keeps the claim true only if the claim does not name the old file.
+		if !claimNames(m.Claim, a.Path) {
+			if to, _, ok := anchor.Relocate(a, scan.list()); ok {
+				moved = true
+				movedReasons = append(movedReasons, a.Path+" → "+to.Path)
+				v.Pointers = append(v.Pointers, pointer(to.Path, to.Line, to.EndLine))
+				continue
+			}
+		}
+		v.Reasons = append(v.Reasons, r.Detail)
+		stale = true
 	}
 	if m.Expires != nil && e.now().After(*m.Expires) {
 		v.Reasons = append(v.Reasons, "expired")
+		stale = true
+	}
+	switch {
+	case stale:
 		v.Freshness = Stale
+	case bad || len(m.Anchors) == 0:
+		v.Freshness = Unverifiable
+	case moved:
+		v.Freshness = Moved
+		v.Reasons = movedReasons
+	default:
+		v.Freshness = Verified
 	}
 	return v
+}
+
+// claimNames reports whether a claim mentions a file by its path or name,
+// e.g. "registered in builtin/builtin.go" or "in builtin.go".
+func claimNames(claim, file string) bool {
+	return strings.Contains(claim, file) || strings.Contains(claim, path.Base(file))
 }
 
 func pointer(path string, start, end int) string {
@@ -338,9 +385,10 @@ func (e *Engine) Remember(in RememberInput) (*store.Memory, Verdict, error) {
 
 // AnchorStatus is one anchor and whether it currently holds.
 type AnchorStatus struct {
-	Raw    string `json:"anchor"`
-	OK     bool   `json:"ok"`
-	Detail string `json:"detail,omitempty"`
+	Raw     string `json:"anchor"`
+	OK      bool   `json:"ok"`
+	Detail  string `json:"detail,omitempty"`
+	MovedTo string `json:"moved_to,omitempty"` // "new.go:12-30" when a sealed symbol moved unchanged
 }
 
 // GetResult is a full memory with its current verdict.
@@ -356,14 +404,27 @@ func (e *Engine) Get(ref string) (*GetResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	g := &GetResult{Memory: m, Verdict: e.Judge(m)}
+	scan := &goScan{root: e.Store.Root}
+	g := &GetResult{Memory: m, Verdict: e.judge(m, scan)}
 	for _, raw := range m.Anchors {
 		st := AnchorStatus{Raw: raw}
-		if a, err := anchor.Parse(raw); err != nil {
+		a, err := anchor.Parse(raw)
+		if err != nil {
 			st.Detail = "bad anchor"
-		} else {
-			r := anchor.Check(e.Store.Root, a)
-			st.OK, st.Detail = r.OK, r.Detail
+			g.Anchors = append(g.Anchors, st)
+			continue
+		}
+		r := anchor.Check(e.Store.Root, a)
+		st.OK, st.Detail = r.OK, r.Detail
+		if !r.OK {
+			to, changed, ok := anchor.Relocate(a, scan.list())
+			switch {
+			case ok && !claimNames(m.Claim, a.Path):
+				st.MovedTo = pointer(to.Path, to.Line, to.EndLine)
+			case len(changed) > 0:
+				// For a human deciding whether to reseal or supersede.
+				st.Detail += "; " + a.Arg + " is declared, with other code, in " + strings.Join(changed, ", ")
+			}
 		}
 		g.Anchors = append(g.Anchors, st)
 	}
@@ -386,9 +447,10 @@ func item(m *store.Memory, v Verdict) VerifyItem {
 func (e *Engine) VerifyAll() []VerifyItem {
 	all, _ := e.Store.List()
 	var out []VerifyItem
+	scan := &goScan{root: e.Store.Root}
 	for _, m := range all {
 		if m.Status == store.StatusActive {
-			out = append(out, item(m, e.Judge(m)))
+			out = append(out, item(m, e.judge(m, scan)))
 		}
 	}
 	return out
@@ -405,8 +467,10 @@ func (e *Engine) Verify(ref string) (*VerifyItem, error) {
 }
 
 // Reseal records that a stale memory was re-checked and still holds: file
-// hashes are refreshed. Pattern and existence anchors must already hold, so
-// a claim that is actually wrong cannot be resealed; supersede it instead.
+// hashes and symbol fingerprints are refreshed, and a symbol that moved
+// unchanged gets its new path. Pattern and existence anchors must already
+// hold, so a claim that is actually wrong cannot be resealed; supersede it
+// instead.
 // A positive ttl sets a new expiry; unanchored memories get UnanchoredTTL
 // when ttl is zero.
 func (e *Engine) Reseal(ref string, ttl time.Duration) (*VerifyItem, error) {
@@ -426,6 +490,9 @@ func (e *Engine) Reseal(ref string, ttl time.Duration) (*VerifyItem, error) {
 		a2, err := anchor.Reseal(e.Store.Root, a)
 		if err != nil {
 			return nil, fmt.Errorf("claim no longer holds (%v): supersede it instead", err)
+		}
+		if a2.Path != a.Path && claimNames(m.Claim, a.Path) {
+			return nil, fmt.Errorf("the claim names %s, which no longer has %s: supersede it instead", a.Path, a.Arg)
 		}
 		sealed = append(sealed, a2.String())
 	}

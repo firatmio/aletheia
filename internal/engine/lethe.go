@@ -95,6 +95,7 @@ type Stats struct {
 	Active       int      `json:"active"`
 	Superseded   int      `json:"superseded"`
 	Verified     int      `json:"verified"`
+	Moved        int      `json:"moved,omitempty"`
 	Unverifiable int      `json:"unverifiable"`
 	Stale        int      `json:"stale"`
 	FullTokens   int      `json:"full_tokens"`  // estimated tokens to load every active memory in full
@@ -106,16 +107,19 @@ type Stats struct {
 func (e *Engine) Stats() Stats {
 	all, problems := e.Store.List()
 	st := Stats{Total: len(all), Problems: problems}
+	scan := &goScan{root: e.Store.Root}
 	for _, m := range all {
 		if m.Status != store.StatusActive {
 			st.Superseded++
 			continue
 		}
 		st.Active++
-		v := e.Judge(m)
+		v := e.judge(m, scan)
 		switch v.Freshness {
 		case Verified:
 			st.Verified++
+		case Moved:
+			st.Moved++
 		case Unverifiable:
 			st.Unverifiable++
 		default:

@@ -181,6 +181,13 @@ Aletheia has no claim yet. The goal is to **save tokens without losing quality**
 **v0.2: smarter anchors**
 - `symbol:PATH::Name`: anchor to a Go/TS/Python function or type by name so unrelated edits in the same file don't stale it (regex-based first, tree-sitter later only if Fırat accepts a dependency).
 - Git awareness: optional `commit` field, follow renames (`git log --follow`) and suggest re-anchoring instead of just "missing".
+- **Moved symbols (done, 2026-10-22, memory format change approved by Fırat):**
+  - **Sealing:** Go `symbol:` anchors are sealed with a 16-hex fingerprint of the declaration's tokens (`symbol:PATH::Name@fp`). Comments, layout and trailing commas are ignored.
+  - **Edits in place:** they never stale the anchor.
+  - **Moves:** when the declaration leaves its file, exactly one same-name declaration with the same fingerprint makes the memory `[moved]`. The memory gets a pointer to the new lines, and `verify --reseal` records the path. A changed declaration, two copies, or a claim naming the old file all stay stale.
+  - **Not git:** no `git log --follow` and nothing is executed (invariant 2).
+  - **Cost:** about 180 ms extra on Hugo while a sealed anchor needs relocating.
+  - **Compatibility:** older binaries read sealed anchors as bad anchors (unverifiable).
 - `aletheia doctor`: list memories whose `file:` anchors stale constantly and suggest `contains:`.
 
 **v0.3: prove the token claim** (important for launch credibility)
