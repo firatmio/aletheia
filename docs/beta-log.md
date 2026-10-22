@@ -48,4 +48,19 @@ At the end of each week, also log `aletheia verify` and `aletheia stats`.
 - **What happened:** the claim mentions CLAUDE.md and AGENTS.md, so `remember` added `exists:AGENTS.md`. In this repo AGENTS.md is untracked (dogfood output). On a fresh clone the memory `ae03a3` would be stale for a reason unrelated to its claim.
 - **Follow-up:** consider skipping automatic anchors on files git does not track, or noting them when saving.
 
-Hooks were added during this session. Claude Code loads hooks at session start, so prompt and Stop capture are expected to take effect from the next session. Check that in the first entry of the next session.
+**B5 · good · the hooks were active right away.**
+- **What happened:** we expected the hooks to start in the next session. They did not wait for one:
+  - The prompt hook already ran on the next prompt after `settings.local.json` was written.
+  - The Stop hook had saved two maps from this session's edits, one for the batch-remember task and one for the beta setup.
+- **Follow-up:** none; README can say hooks apply without a restart in current Claude Code.
+
+**B6 · needless-stale · memories are blind to branches.**
+- **What happened:** the map for the beta setup anchors `exists:docs/beta-log.md`. That file exists only on the `docs/beta-log` branch, so the memory went stale and was hidden as soon as we switched to `main` for the next fix. The check is correct for the files on disk, but the memory is not wrong; it belongs to an unmerged branch.
+- **Follow-up:** consider recording the branch in captured maps and saying "on branch X" instead of hiding, or simply let these come back on merge. Watch how often it happens.
+
+**B2, resolved** on branch `fix/recall-relevance-floor`. There were three causes, each with its own fix:
+- **Filler words in the query:** words like "how" and "does" are now dropped from queries.
+- **The captured-map template:** its prefix ("Map: a task like") is no longer indexed.
+- **Weak matches:** a new relevance floor at 30% of the best match drops them.
+
+On this repo's store the B2 query now returns nothing; there is no capture memory. "how is recall ranked" returns the two ranking memories.
