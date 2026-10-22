@@ -195,3 +195,19 @@ The agent moved the old Aletheia files aside, fetched the guide with curl and fo
    - **Idea:** put a build stamp in the guide, such as a commit hash or a timestamp, that an agent can compare with `aletheia version` or with the curl result.
 2. **Dry-run heading.** Without a prompt the heading still says "Code map for this prompt". It should say "Code map" or "Project code map".
 3. **Not Aletheia's problem, worth knowing.** Claude Code's auto mode blocked deleting the project's old Aletheia files during the reset. `Remove-Item "$bin\aletheia-old*.exe"` passed.
+
+## 2026-10-22: 0.1.0-beta.4 (main b9bcfb9, with [moved])
+
+**B13 · good · the Windows upgrade command, live.** We upgraded with exactly the guide's three PowerShell lines while this session's `aletheia serve` held the exe open.
+- An earlier old copy that was no longer in use was deleted.
+- The locked exe was moved aside as `aletheia-old-<random>.exe`.
+- `go install` succeeded.
+
+`aletheia version` now shows the commit: `0.1.0-beta.4 (v0.0.0-20261022184255-b9bcfb902aed+dirty)`. `+dirty` comes from the untracked files in this checkout (AGENTS.md, launch.json).
+
+**B14 · good · a memory went stale because of our own change.** `175ba5` said the freshness factors were "verified 1, unverifiable 0.7, stale 0.3". Adding `Moved: 0.9` in #19 broke its `contains:` pattern, and it was hidden as stale, correctly: the claim had become incomplete. It was superseded by `b90953`, anchored with a sealed `symbol:internal/engine/recall.go::freshnessFactor` and the new `contains:` line. Stale count: 1 → 0.
+
+**B15 · finding · agents rarely use symbol anchors, so [moved] covers little so far.**
+- **The count:** across this repo's 34 active memories, the anchors are 58 `exists:` (mostly captured maps), 28 `contains:`, 2 `file:` and 1 `symbol:`. That one we wrote ourselves.
+- **What it means:** `[moved]` only helps sealed symbol anchors, so in our own store it currently protects one memory. The snippet already says to prefer `symbol:` for claims about one declaration; agents still reach for `contains:`.
+- **Follow-up:** worth measuring in the next lab run, and possibly nudging. One option: when a `contains:` match lies inside a single Go declaration, `remember` could suggest, or add, a sealed `symbol:` anchor for it. The `contains:` anchor would then have to move with that declaration, or it would still stale the memory on its own.
