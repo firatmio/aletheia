@@ -201,3 +201,55 @@ func TestRelocateStaysInsideTheProject(t *testing.T) {
 		}
 	}
 }
+
+func TestEnclosingDeclOfAContainsMatch(t *testing.T) {
+	root := project(t)
+	writeAll(t, root, "a.go", `package a
+
+import "fmt"
+
+// F prints.
+func F() { fmt.Println("in F") }
+
+type T struct{ n int }
+
+func (t *T) M() int { return t.n + 41 }
+
+var (
+	A = "in group A"
+	B = "in group B"
+)
+
+const C = "single const"
+
+var x, y = "pair", 2
+
+func G() {}
+func H() {}
+`)
+	writeAll(t, root, "notes.md", "in F\n")
+	for pattern, want := range map[string]string{
+		`"in F"`: "F", `t\.n \+ 41`: "T.M", `"in group B"`: "B", `single const`: "C", `n int`: "T",
+		`var \(`: "", `"pair"`: "", `F prints`: "", `func G\(\) \{\}\nfunc H`: "", `import "fmt"`: "",
+	} {
+		got, ok := EnclosingDecl(root, Anchor{Kind: KindContains, Path: "a.go", Arg: pattern})
+		if got != want || ok != (want != "") {
+			t.Errorf("EnclosingDecl(%q) = %q, %v; want %q", pattern, got, ok, want)
+		}
+	}
+	if _, ok := EnclosingDecl(root, Anchor{Kind: KindContains, Path: "notes.md", Arg: "in F"}); ok {
+		t.Error("only Go files have declarations")
+	}
+}
+
+func TestCheckInOnlyAcceptsMatchesInsideTheRange(t *testing.T) {
+	root := project(t)
+	writeAll(t, root, "b.go", "package a\n\nfunc A() { _ = 30 }\n\nfunc B() { _ = 30 }\n")
+	a := Anchor{Kind: KindContains, Path: "old.go", Arg: `_ = 30`}
+	if r := CheckIn(root, a, "b.go", 5, 5); !r.OK || r.Line != 5 {
+		t.Fatalf("the match inside lines 5-5 counts, even though an earlier one exists: %+v", r)
+	}
+	if r := CheckIn(root, a, "b.go", 1, 2); r.OK {
+		t.Fatalf("no match inside lines 1-2: %+v", r)
+	}
+}

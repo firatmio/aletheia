@@ -211,3 +211,11 @@ The agent moved the old Aletheia files aside, fetched the guide with curl and fo
 - **The count:** across this repo's 34 active memories, the anchors are 58 `exists:` (mostly captured maps), 28 `contains:`, 2 `file:` and 1 `symbol:`. That one we wrote ourselves.
 - **What it means:** `[moved]` only helps sealed symbol anchors, so in our own store it currently protects one memory. The snippet already says to prefer `symbol:` for claims about one declaration; agents still reach for `contains:`.
 - **Follow-up:** worth measuring in the next lab run, and possibly nudging. One option: when a `contains:` match lies inside a single Go declaration, `remember` could suggest, or add, a sealed `symbol:` anchor for it. The `contains:` anchor would then have to move with that declaration, or it would still stale the memory on its own.
+
+**B15, done** on branch `feat/contains-follows-symbol`.
+- **Automatic symbol anchor:** when a `contains:` match lies inside a single Go declaration, `remember` adds a sealed `symbol:` anchor for that declaration. A comment-only match gets none, since it is a weak anchor already. A note tells the agent.
+- **The contains anchor follows:** when that declaration moves unchanged, the `contains:` anchor moves with it, but only if its pattern still matches inside the moved declaration's lines. The pattern appearing elsewhere in the new file does not count. `get` and `--reseal` treat both anchors the same way.
+- **On a Hugo clone:**
+  - **The memory:** an agent-style memory with only `contains:tpl/math/math.go::af, err := cast\.ToFloat64E\(n\)`.
+  - **When saved:** it gained `symbol:tpl/math/math.go::Namespace.Abs@a5964fbf…`.
+  - **After `git mv` to `arith.go`:** it comes back as `[moved: tpl/math/math.go → tpl/math/arith.go] … (tpl/math/arith.go:48, tpl/math/arith.go:47-54)`.

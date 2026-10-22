@@ -120,6 +120,7 @@ Aletheia pays off where finding the right place is expensive, in mid-size and la
   - **Edits in place:** they never stale the anchor. If the declaration is still in its file, the fingerprint is not even consulted.
   - **A moved declaration:** if the declaration leaves its file, Aletheia searches the project for it. When exactly one declaration with that name has the same fingerprint, the memory comes back as `[moved: old.go → new.go]` with the new lines, and `verify <id> --reseal` records the new path.
   - **Anything less certain stays stale and hidden:** the code changed on the way, several copies match, or the claim names the old file.
+  - **`contains` anchors in Go code:** when one matches inside a single declaration, `remember` adds a sealed `symbol` anchor for that declaration. The `contains` anchor then moves with it, but only if its pattern still matches inside that declaration at the new place.
 - In a `contains` pattern, a run of spaces matches any run of spaces or tabs, so reformatting does not stale it.
 - Files named in a claim get an `exists:` anchor automatically.
 - `remember` warns when a `contains` anchor only matches comments, since a comment can stay while the code changes.

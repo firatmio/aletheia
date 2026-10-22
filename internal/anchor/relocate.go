@@ -180,3 +180,98 @@ func Relocate(a Anchor, files *Files) (moved Moved, changed []string, ok bool) {
 	}
 	return matches[0], changed, true
 }
+
+// EnclosingDecl returns the top-level Go declaration a contains anchor's
+// match lies in, spelled as a symbol anchor names it (Name or Type.Method).
+// The whole match must be inside one function, method, type, or one
+// var/const of a single name; a match on a group's keyword line, across
+// declarations, or in a doc comment has none.
+func EnclosingDecl(root string, a Anchor) (string, bool) {
+	if a.Kind != KindContains || !strings.HasSuffix(a.Path, ".go") {
+		return "", false
+	}
+	r := Check(root, a)
+	if !r.OK {
+		return "", false
+	}
+	full, err := resolve(root, a.Path)
+	if err != nil {
+		return "", false
+	}
+	data, err := readHead(full)
+	if err != nil {
+		return "", false
+	}
+	return enclosingGoDecl(data, r.Line, r.EndLine)
+}
+
+func enclosingGoDecl(data []byte, from, to int) (string, bool) {
+	fset := token.NewFileSet()
+	file, _ := parser.ParseFile(fset, "", data, parser.SkipObjectResolution)
+	if file == nil {
+		return "", false
+	}
+	covers := func(n ast.Node) bool {
+		return fset.Position(n.Pos()).Line <= from && to <= fset.Position(n.End()).Line
+	}
+	for _, d := range file.Decls {
+		if !covers(d) {
+			continue
+		}
+		switch d := d.(type) {
+		case *ast.FuncDecl:
+			if d.Recv == nil {
+				return d.Name.Name, true
+			}
+			if r := recvType(d.Recv); r != "" {
+				return r + "." + d.Name.Name, true
+			}
+			return "", false
+		case *ast.GenDecl:
+			for _, s := range d.Specs {
+				if len(d.Specs) > 1 && !covers(s) {
+					continue
+				}
+				switch s := s.(type) {
+				case *ast.TypeSpec:
+					return s.Name.Name, true
+				case *ast.ValueSpec:
+					if len(s.Names) == 1 {
+						return s.Names[0].Name, true
+					}
+				}
+				return "", false
+			}
+			return "", false
+		}
+	}
+	return "", false
+}
+
+// CheckIn checks a contains anchor's pattern against another file, and only
+// accepts a match that lies within lines [from, to] there: the range of the
+// declaration the match belonged to, after that declaration moved.
+func CheckIn(root string, a Anchor, path string, from, to int) Result {
+	if a.Kind != KindContains {
+		return Result{Detail: a.Path + ": not a contains anchor"}
+	}
+	full, err := resolve(root, path)
+	if err != nil {
+		return Result{Detail: path + ": " + err.Error()}
+	}
+	data, err := readHead(full)
+	if err != nil {
+		return Result{Detail: path + ": " + err.Error()}
+	}
+	re, err := compileContains(a.Arg)
+	if err != nil {
+		return Result{Detail: path + ": bad regex"}
+	}
+	for _, loc := range re.FindAllIndex(data, -1) {
+		start, end := lineOf(data, loc[0]), lineOf(data, max(loc[0], loc[1]-1))
+		if from <= start && end <= to {
+			return Result{OK: true, Line: start, EndLine: end}
+		}
+	}
+	return Result{Detail: path + ": pattern not found in the moved declaration"}
+}

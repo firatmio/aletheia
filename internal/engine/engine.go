@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -85,36 +86,82 @@ func (s *goScan) list() *anchor.Files {
 	return s.files
 }
 
+// outcome is one anchor of a memory, checked against the project.
+type outcome struct {
+	a       anchor.Anchor
+	bad     bool          // the anchor does not parse
+	r       anchor.Result // the check against its own path
+	to      *anchor.Moved // where its evidence is now, when it moved unchanged
+	changed []string      // files declaring a symbol's name with other code
+}
+
+// assess checks every anchor of a memory. Sealed symbols whose declaration
+// left its file are relocated; a contains anchor that fails then moves with
+// a declaration of the same memory that moved from its file, but only if
+// its pattern still matches inside that declaration. Whether a move keeps
+// the claim true is the caller's to decide (see claimNames).
+func (e *Engine) assess(m *store.Memory, scan *goScan) []outcome {
+	out := make([]outcome, len(m.Anchors))
+	moves := map[string][]anchor.Moved{} // old path -> declarations of this memory that moved from it
+	for i, raw := range m.Anchors {
+		a, err := anchor.Parse(raw)
+		if err != nil {
+			out[i] = outcome{bad: true}
+			continue
+		}
+		o := outcome{a: a, r: anchor.Check(e.Store.Root, a)}
+		if !o.r.OK && a.Kind == anchor.KindSymbol {
+			to, changed, ok := anchor.Relocate(a, scan.list())
+			o.changed = changed
+			if ok {
+				o.to = &to
+				moves[a.Path] = append(moves[a.Path], to)
+			}
+		}
+		out[i] = o
+	}
+	for i := range out {
+		o := &out[i]
+		if o.bad || o.r.OK || o.a.Kind != anchor.KindContains {
+			continue
+		}
+		for _, d := range moves[o.a.Path] {
+			if r := anchor.CheckIn(e.Store.Root, o.a, d.Path, d.Line, d.EndLine); r.OK {
+				o.to = &anchor.Moved{Path: d.Path, Line: r.Line, EndLine: r.EndLine}
+				break
+			}
+		}
+	}
+	return out
+}
+
 func (e *Engine) judge(m *store.Memory, scan *goScan) Verdict {
 	var v Verdict
 	var stale, bad, moved bool
 	var movedReasons []string
-	for _, raw := range m.Anchors {
-		a, err := anchor.Parse(raw)
-		if err != nil {
+	for _, o := range e.assess(m, scan) {
+		switch {
+		case o.bad:
 			v.Reasons = append(v.Reasons, "bad anchor")
 			bad = true
-			continue
-		}
-		r := anchor.Check(e.Store.Root, a)
-		if r.OK {
-			if r.Line > 0 {
-				v.Pointers = append(v.Pointers, pointer(a.Path, r.Line, r.EndLine))
+		case o.r.OK:
+			if o.r.Line > 0 {
+				v.Pointers = append(v.Pointers, pointer(o.a.Path, o.r.Line, o.r.EndLine))
 			}
-			continue
-		}
-		// A sealed symbol may have moved, unchanged, to another file. That
-		// keeps the claim true only if the claim does not name the old file.
-		if !claimNames(m.Claim, a.Path) {
-			if to, _, ok := anchor.Relocate(a, scan.list()); ok {
-				moved = true
-				movedReasons = append(movedReasons, a.Path+" → "+to.Path)
-				v.Pointers = append(v.Pointers, pointer(to.Path, to.Line, to.EndLine))
-				continue
+		// Code that moved unchanged keeps the claim true only if the claim
+		// does not name the old file.
+		case o.to != nil && !claimNames(m.Claim, o.a.Path):
+			moved = true
+			if r := o.a.Path + " → " + o.to.Path; !slices.Contains(movedReasons, r) {
+				movedReasons = append(movedReasons, r)
 			}
+			if p := pointer(o.to.Path, o.to.Line, o.to.EndLine); !slices.Contains(v.Pointers, p) {
+				v.Pointers = append(v.Pointers, p)
+			}
+		default:
+			v.Reasons = append(v.Reasons, o.r.Detail)
+			stale = true
 		}
-		v.Reasons = append(v.Reasons, r.Detail)
-		stale = true
 	}
 	if m.Expires != nil && e.now().After(*m.Expires) {
 		v.Reasons = append(v.Reasons, "expired")
@@ -181,6 +228,44 @@ func (e *Engine) anchorNamedPaths(claim string, covered map[string]bool) (added,
 		added = append(added, a.String())
 	}
 	return added, missing
+}
+
+// symbolsForContains returns sealed symbol anchors for the Go declarations
+// that contains anchors match inside, unless the memory already anchors
+// them. Only a sealed symbol can be recognised after it moves (Relocate),
+// and a contains anchor moves with the declaration it lies in (assess).
+// Agents seldom write symbol anchors themselves; this gives their contains
+// anchors the same protection.
+func (e *Engine) symbolsForContains(anchors []string) []string {
+	have := map[string]bool{}
+	var contains []anchor.Anchor
+	for _, raw := range anchors {
+		a, err := anchor.Parse(raw)
+		switch {
+		case err != nil:
+		case a.Kind == anchor.KindSymbol:
+			have[a.Path+"::"+a.Arg] = true
+		case a.Kind == anchor.KindContains:
+			contains = append(contains, a)
+		}
+	}
+	var out []string
+	for _, a := range contains {
+		if anchor.CommentOnly(e.Store.Root, a) {
+			continue // a weak anchor already; a symbol would make it look stronger than it is
+		}
+		name, ok := anchor.EnclosingDecl(e.Store.Root, a)
+		if !ok || have[a.Path+"::"+name] {
+			continue
+		}
+		s, err := anchor.Make(e.Store.Root, "symbol:"+a.Path+"::"+name)
+		if err != nil || s.Seal == "" {
+			continue
+		}
+		have[a.Path+"::"+name] = true
+		out = append(out, s.String())
+	}
+	return out
 }
 
 // RememberInput describes a new memory.
@@ -313,6 +398,10 @@ func (e *Engine) Remember(in RememberInput) (*store.Memory, Verdict, error) {
 		covered[a.Path] = true
 	}
 	explicit := len(anchors)
+	if s := e.symbolsForContains(anchors); len(s) > 0 {
+		anchors = append(anchors, s...)
+		notes = append(notes, "added "+strings.Join(s, ", ")+": the memory follows that code if it moves")
+	}
 	added, missing := e.anchorNamedPaths(claim, covered)
 	if len(added) > 0 {
 		anchors = append(anchors, added...)
@@ -406,25 +495,17 @@ func (e *Engine) Get(ref string) (*GetResult, error) {
 	}
 	scan := &goScan{root: e.Store.Root}
 	g := &GetResult{Memory: m, Verdict: e.judge(m, scan)}
-	for _, raw := range m.Anchors {
-		st := AnchorStatus{Raw: raw}
-		a, err := anchor.Parse(raw)
-		if err != nil {
+	for i, o := range e.assess(m, scan) {
+		st := AnchorStatus{Raw: m.Anchors[i], OK: o.r.OK, Detail: o.r.Detail}
+		switch {
+		case o.bad:
 			st.Detail = "bad anchor"
-			g.Anchors = append(g.Anchors, st)
-			continue
-		}
-		r := anchor.Check(e.Store.Root, a)
-		st.OK, st.Detail = r.OK, r.Detail
-		if !r.OK {
-			to, changed, ok := anchor.Relocate(a, scan.list())
-			switch {
-			case ok && !claimNames(m.Claim, a.Path):
-				st.MovedTo = pointer(to.Path, to.Line, to.EndLine)
-			case len(changed) > 0:
-				// For a human deciding whether to reseal or supersede.
-				st.Detail += "; " + a.Arg + " is declared, with other code, in " + strings.Join(changed, ", ")
-			}
+		case o.r.OK:
+		case o.to != nil && !claimNames(m.Claim, o.a.Path):
+			st.MovedTo = pointer(o.to.Path, o.to.Line, o.to.EndLine)
+		case len(o.changed) > 0:
+			// For a human deciding whether to reseal or supersede.
+			st.Detail += "; " + o.a.Arg + " is declared, with other code, in " + strings.Join(o.changed, ", ")
 		}
 		g.Anchors = append(g.Anchors, st)
 	}
@@ -482,17 +563,20 @@ func (e *Engine) Reseal(ref string, ttl time.Duration) (*VerifyItem, error) {
 		return nil, fmt.Errorf("memory %s is superseded", m.ID)
 	}
 	sealed := make([]string, 0, len(m.Anchors))
-	for _, raw := range m.Anchors {
-		a, err := anchor.Parse(raw)
-		if err != nil {
-			return nil, fmt.Errorf("anchor %q: %w", raw, err)
+	for i, o := range e.assess(m, &goScan{root: e.Store.Root}) {
+		if o.bad {
+			return nil, fmt.Errorf("anchor %q is not valid", m.Anchors[i])
+		}
+		a := o.a
+		if !o.r.OK && o.to != nil {
+			if claimNames(m.Claim, a.Path) {
+				return nil, fmt.Errorf("the claim names %s, whose code moved to %s: supersede it instead", a.Path, o.to.Path)
+			}
+			a.Path = o.to.Path // the code moved unchanged: the anchor follows it
 		}
 		a2, err := anchor.Reseal(e.Store.Root, a)
 		if err != nil {
 			return nil, fmt.Errorf("claim no longer holds (%v): supersede it instead", err)
-		}
-		if a2.Path != a.Path && claimNames(m.Claim, a.Path) {
-			return nil, fmt.Errorf("the claim names %s, which no longer has %s: supersede it instead", a.Path, a.Arg)
 		}
 		sealed = append(sealed, a2.String())
 	}
