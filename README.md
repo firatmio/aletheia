@@ -69,6 +69,16 @@ For Claude Code, add the two hooks to `.claude/settings.json`. Recall then happe
 
 Memories live in `.aletheia/memories/*.md` as plain Markdown. Commit them and your team, and every agent, shares one memory that verifies itself on each machine.
 
+**Upgrading:** run the same `go install` again.
+- **On Windows,** a running agent keeps `aletheia.exe` open through the MCP server, so the install fails with "file in use". Quit the agent first, or rename the old binary and install. Windows allows renaming a running exe:
+
+  ```powershell
+  Rename-Item "$(go env GOPATH)\bin\aletheia.exe" aletheia-old.exe
+  go install github.com/firatmio/aletheia/cmd/aletheia@latest
+  ```
+
+- **Which version runs:** the hooks use the new binary right away. The MCP server keeps the old one until the agent restarts.
+
 ## Results
 
 We measured with headless Claude Code (Opus 5.5) on real repositories. Each task ran with and without Aletheia, and the same hidden acceptance tests judged success.
