@@ -131,8 +131,23 @@ Status 2026-10-21 (first pass, details in `docs/dogfood-4.2.md`):
   - plain HTML with no dependencies.
 - **Still to do:**
   - record the demo GIF with VHS in Docker, after R5;
-  - make the social preview PNG (1280×640; GitHub does not take SVG);
-  - deploy the landing page.
+  - make the social preview PNG (1280×640; GitHub does not take SVG).
+- **Landing page (2026-10-22):** `site/`, Vite + Solid with bun, prerendered at build time. All copy is in `site/src/content.ts`; set `released: true` there when the repo goes public.
+  - Deployed with the Vercel CLI to project `aletheia`: https://aletheia-rho-ten.vercel.app.
+  - `aletheia.firattunaarslan.me` is attached; it needs a CNAME `aletheia` → `f9f7168c64c92b2c.vercel-dns-017.com` at Namecheap.
+  - Still to do: the "try it" block (edit a line, watch the memory go stale) and an og:image.
+- **Site redesign (decided with Fırat, 2026-10-22):** storyboard in the claude.ai artifact "Aletheia Site Storyboard".
+  - **Palette:** grounds and surfaces are pure neutral grays (no blue tint), dark by default. Dark: #0a0a0a / #141414 / #1c1c1c, line #2a2a2a, text #f5f5f5. Light is the same grays reversed.
+  - **Accents:** color only carries meaning. Verified #3fc69a/#0f7a5a, stale #e3a14a/#a85f00, broken #f87171/#c0352b (ghost panel only), pointer #8fb4ff/#2f5bd3.
+  - **Flow:**
+    0. Hero, with the terminal peeking at the bottom.
+    1. On scroll, the terminal comes to the middle (sticky) and the session plays from the scroll position: recall in the prompt, then live counters.
+    2. The file moves: the visitor triggers the rename, the stale memory is hidden, and a ghost panel (labelled an illustration) shows the similarity-memory failure.
+    3. The Stop hook writes the map.
+    4. Glitch: stale lines dissolve and verified lines fly to the board.
+    5. Evidence board with "try it".
+    6. Results with footnotes, quick start.
+  - **Rules:** never hijack scroll speed; a scene rail with "skip"; reduced motion gets static step cards; terminal lines come from real lab runs and are labelled.
 
 ### 4.5 Token-saving direction (decided with Fırat, 2026-10-21)
 Aletheia has no claim yet. The goal is to **save tokens without losing quality**, because without a clear saving nobody has a reason to use it. Verification (stale memories never reach the agent) stays the differentiator, and the saving is built on top of it.

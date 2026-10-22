@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Aletheia: memory your coding agent can verify</title>
+    <meta
+      name="description"
+      content="Every memory carries evidence from your code. Aletheia re-checks it on every recall, points your agent at the exact lines, and keeps stale facts out of its context."
+    />
+    <meta property="og:title" content="Aletheia: memory your coding agent can verify" />
+    <meta
+      property="og:description"
+      content="Memory for coding agents that checks itself against your code. Stale facts never reach the context."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://aletheia.firattunaarslan.me/" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      // Apply a saved theme before the first paint, so there is no flash.
+      try {
+        var t = localStorage.getItem("theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+    <!--app-head-->
+  </head>
+  <body>
+    <div id="app"><!--app-html--></div>
+    <script type="module" src="/src/entry-client.tsx"></script>
+  </body>
+</html>
