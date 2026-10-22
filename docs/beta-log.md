@@ -161,3 +161,22 @@ The same project, a new session. Three of B9's points held:
   A prompt about building, testing or shipping, and the overview without a prompt, now start with `build and CI: …`.
 - **Stopwords:** "project", "repo", "repository" and "codebase" are now stopwords, so they no longer pull in files.
 - **Result on this repo:** "how is this project built" leads with `build and CI: .goreleaser.yaml, go.mod, …, .github/workflows/ci.yml, .github/workflows/release.yml`. "add a CLI flag to recall" gets no build line.
+
+## 2026-10-22: the fourth agent setup, after B10
+
+What held:
+- **Install:** the PowerShell `GOPRIVATE` command worked on the first try.
+- **The guide:** WebFetch served the current guide this time, date line included. It still summarizes, but the instructions survive the summary.
+- **init:** the ignored-file note and the next steps work.
+- **Build line:** it appears in the map.
+
+**B11 · friction · two left.**
+1. **The Windows upgrade command fails on the second upgrade.**
+   - **What happened:** `Rename-Item … aletheia-old.exe` fails when `aletheia-old.exe` already exists ("Cannot create a file when that file already exists"). The install still finished because the exe was not running at the time. With the hooks active, the exe is locked and the upgrade would fail.
+   - **Also:** the line after the private-install block started with a stray space. The template had `${privateInstall} To upgrade…`.
+2. **Unrelated files under the build line.** "how is this project built" still listed `internal/corpus/run.go` and `poisoning.go` under the build line: weak matches that are only noise.
+
+**Fixed on branch `fix/windows-upgrade-and-map-noise`:**
+- **Upgrade command:** it removes `aletheia-old*.exe` copies that are no longer in use, then renames the current exe to `aletheia-old-<random>.exe`. A locked old copy stays and cannot collide. Tested twice in a row with an old copy already present. README and the guide use it, and the stray space is gone.
+- **Build-only questions:** when every topic word is about building, testing or shipping, the map is the build line alone.
+- **Relevance floor:** the code map gets the same floor as recall: files below 30% of the best match are dropped. On this repo, "add a CLI flag to recall" went from six files to the two that matter (`cmd/aletheia/main.go`, `internal/engine/recall.go`).

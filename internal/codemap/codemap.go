@@ -73,6 +73,24 @@ func init() {
 
 const maxBuildFiles = 12
 
+// relevanceFloor drops files that score below this share of the best file,
+// as recall does for memories, so a prompt does not end on weak matches.
+const relevanceFloor = 0.3
+
+// onlyBuildWords reports whether every topic word of a prompt is about
+// building, testing or shipping.
+func onlyBuildWords(weights map[string]float64) bool {
+	if len(weights) == 0 {
+		return false
+	}
+	for w := range weights {
+		if !buildWords[w] {
+			return false
+		}
+	}
+	return true
+}
+
 // SuggestedBudget sizes a map to the project: a small project gets none,
 // since an agent reads all of it in a few calls anyway, and the budget grows
 // with the number of source files.
@@ -331,6 +349,9 @@ func (m *Map) Render(query string, budget int) string {
 	var b strings.Builder
 	used := 0
 	if line := m.buildLine(weights); line != "" {
+		if onlyBuildWords(weights) {
+			return line // "how is this built": the build files are the answer, other files are noise
+		}
 		b.WriteString(line + "\n")
 		used += search.EstimateTokens(line) + 1
 	}
@@ -358,10 +379,14 @@ func (m *Map) Render(query string, budget int) string {
 		}
 	}
 	sort.SliceStable(files, func(i, j int) bool { return score[files[i]] > score[files[j]] })
+	floor := 0.0
+	if len(weights) > 0 && len(files) > 0 {
+		floor = score[files[0]] * relevanceFloor
+	}
 
 	shown := 0
 	for _, f := range files {
-		if score[f] <= 0 || shown >= maxSymbols {
+		if score[f] <= 0 || score[f] < floor || shown >= maxSymbols {
 			break
 		}
 		syms := byFile[f]
