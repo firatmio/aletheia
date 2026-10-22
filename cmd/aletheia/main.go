@@ -12,7 +12,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -100,7 +102,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprint(stdout, usage)
 		return exitOK
 	case "version", "-v", "--version":
-		fmt.Fprintln(stdout, "aletheia", version)
+		fmt.Fprintln(stdout, "aletheia", versionString())
 		return exitOK
 	case "init":
 		return c.init(rest)
@@ -125,6 +127,25 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stderr, "aletheia: unknown command %q\n\n%s", cmd, usage)
 	return exitUsage
+}
+
+// versionString is the release version plus, for a binary built by
+// `go install …@<version>`, the module version Go recorded, e.g.
+// "0.1.0 (v0.0.0-20261022130735-0d57de42de32)", so a build from source
+// still says which commit it is.
+func versionString() string {
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return version
+	}
+	return formatVersion(version, bi.Main.Version)
+}
+
+func formatVersion(release, module string) string {
+	if module == "" || module == "(devel)" || strings.TrimPrefix(module, "v") == release {
+		return release
+	}
+	return release + " (" + module + ")"
 }
 
 // commandHelp returns the usage lines of one command plus its notes, or ""
@@ -159,8 +180,9 @@ Claude Code runs it with one JSON object on stdin:
   {"hook_event_name": "Stop", "session_id": "…", "transcript_path": "…", "cwd": "…"}
     records which files the task changed as a map memory; prints nothing
 Install it with: aletheia init --claude-hooks
-To see what it would add for a prompt, without reading stdin or changing anything:
-  aletheia hook --dry-run "how is this project built"
+To see what it would add, without reading stdin or changing anything:
+  aletheia hook --dry-run                         the overall code map and memories
+  aletheia hook --dry-run "add a CLI flag"        what a specific prompt would get
 `,
 	"init": `
 --claude-hooks merges the UserPromptSubmit and Stop hooks into .claude/settings.json and
@@ -340,7 +362,7 @@ func nextSteps(agents, hooks bool) string {
 			"                                  (run it yourself; agents usually may not change their own hooks)\n")
 	}
 	b.WriteString(`  other MCP clients: {"mcpServers": {"aletheia": {"command": "aletheia", "args": ["serve"]}}}` + "\n" +
-		`  aletheia hook --dry-run "how is this project built"   see what an agent would get` + "\n" +
+		`  aletheia hook --dry-run [prompt]   see what an agent would get; changes nothing` + "\n" +
 		"memories start empty; the code map works from the first prompt (aletheia map \"<topic>\")\n")
 	return b.String()
 }
@@ -357,9 +379,21 @@ func installAgents(root string) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		if gitIgnores(root, name) {
+			msg += " (git ignores " + name + " here, so the note stays on this machine)"
+		}
 		msgs = append(msgs, msg)
 	}
 	return strings.Join(msgs, "\n"), nil
+}
+
+// gitIgnores reports whether git ignores name in root. It asks git when git
+// is installed and root is a repository, and says false otherwise.
+func gitIgnores(root, name string) bool {
+	if _, err := exec.LookPath("git"); err != nil {
+		return false
+	}
+	return exec.Command("git", "-C", root, "check-ignore", "-q", "--", name).Run() == nil
 }
 
 func installSnippet(path, name string) (string, error) {

@@ -60,7 +60,7 @@ For Claude Code, add the two hooks. Recall then happens on every prompt and cost
 
 ```bash
 aletheia init --claude-hooks   # merges them into .claude/settings.json, keeps your other settings
-aletheia hook --dry-run "how is this project built"   # what an agent would get; changes nothing
+aletheia hook --dry-run        # what an agent would get (add a prompt to try one); changes nothing
 ```
 
 Run `init --claude-hooks` yourself. Agents are usually not allowed to change their own hooks, and that is by design. To edit the file by hand instead, use this:

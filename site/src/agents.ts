@@ -11,14 +11,35 @@ import { site } from "./content";
 
 const status = site.released
   ? ""
-  : `Status: pre-release. The source is not public yet, so \`go install\` does not work yet. If \`aletheia version\` already works on this machine, setup can continue from step 2.\n\n`;
+  : `Status: pre-release. The repository is private, so \`go install\` asks for GitHub credentials ("could not read Username"). If \`aletheia version\` already works on this machine, setup continues from step 2. Users with access to the repository can install as shown in step 1.\n\n`;
+
+const privateInstall = site.released
+  ? ""
+  : `
+While the repository is private, Go needs to skip its public proxy and use the user's GitHub credentials. With the GitHub CLI signed in (\`gh auth setup-git\` configures git to use it, a change to the user's git config):
+
+\`\`\`bash
+GOPRIVATE=github.com/firatmio/* ${site.install}
+\`\`\`
+
+In PowerShell: \`$env:GOPRIVATE="github.com/firatmio/*"; ${site.install}\`
+`;
 
 export function agentsMd(): string {
   return `# Aletheia setup guide for coding agents
 
 Aletheia is memory for coding agents that checks itself against the code. Each memory is a claim plus evidence (anchors) that is re-checked on every recall; stale memories are hidden, and recall points at the exact lines to read.
 
-${status}This guide describes the setup. Steps 1, 2 and 4 are commands an agent can run. Step 3 changes the agent's own configuration; that is the user's step.
+${status}The whole setup in four commands; the sections below explain each:
+
+\`\`\`bash
+aletheia version || ${site.install}   # 1. install, unless installed
+aletheia init --agents         # 2. set up the project
+aletheia init --claude-hooks   # 3. the user runs this: agents may not edit their own hooks
+aletheia hook --dry-run        # 4. check what an agent gets
+\`\`\`
+
+Steps 1, 2 and 4 are commands an agent can run. Step 3 changes the agent's own configuration; that is the user's step.
 
 ## 1. Install (skip if \`aletheia version\` prints a version)
 
@@ -27,7 +48,8 @@ aletheia version
 ${site.install}
 \`\`\`
 
-Go 1.24 or newer. To upgrade, run \`go install\` again. On Windows a running agent keeps \`aletheia.exe\` open; renaming the old file first avoids "file in use":
+Go 1.24 or newer.
+${privateInstall} To upgrade, run \`go install\` again. On Windows a running agent keeps \`aletheia.exe\` open; renaming the old file first avoids "file in use":
 
 \`\`\`powershell
 Rename-Item "$(go env GOPATH)\\bin\\aletheia.exe" aletheia-old.exe
@@ -70,11 +92,11 @@ Other MCP clients (Cursor, Cline, Codex, Claude Desktop): the user adds this ser
 ## 4. Check
 
 \`\`\`bash
-aletheia hook --dry-run "how is this project built"
+aletheia hook --dry-run
 aletheia stats
 \`\`\`
 
-The dry run shows what the hook would add for a prompt; it reads no stdin and changes nothing. A new store has no memories yet; the code map works from the first prompt.
+The dry run shows what the hook would add: the overall code map and memories, or, with a prompt as argument, what that prompt would get. It reads no stdin and changes nothing. A new store has no memories yet; the code map works from the first prompt.
 
 ## 5. Using it
 
