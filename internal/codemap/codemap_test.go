@@ -117,3 +117,32 @@ func TestRenderRespectsBudget(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildFilesAnswerBuildQuestions(t *testing.T) {
+	root := project(t)
+	write(t, root, "go.mod", "module x\n\ngo 1.24\n")
+	write(t, root, "Makefile", "test:\n\tgo test ./...\n")
+	write(t, root, ".github/workflows/ci.yml", "on: push\n")
+	write(t, root, "scripts/gen.sh", "echo gen\n")
+	write(t, root, "builtin/deep/go.mod", "module too/deep\n")
+	m, _ := Build(root)
+
+	out := m.Render("how is this project built", 300)
+	if !strings.HasPrefix(out, "build and CI: ") {
+		t.Fatalf("a build question should lead with the build files:\n%s", out)
+	}
+	for _, f := range []string{"go.mod", "Makefile", "scripts/", ".github/workflows/ci.yml"} {
+		if !strings.Contains(out, f) {
+			t.Fatalf("%s missing from the build line:\n%s", f, out)
+		}
+	}
+	if strings.Contains(out, "builtin/deep/go.mod") {
+		t.Fatalf("manifests deeper than one folder are not listed:\n%s", out)
+	}
+	if out := m.Render("", 300); !strings.HasPrefix(out, "build and CI: ") {
+		t.Fatalf("the overview should include the build files:\n%s", out)
+	}
+	if out := m.Render("add a builtin function", 300); strings.Contains(out, "build and CI") {
+		t.Fatalf("a code question should not get the build line:\n%s", out)
+	}
+}

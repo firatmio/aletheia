@@ -135,3 +135,29 @@ A new session in the same project followed the new guide.
 - **Dry-run example:** examples use `aletheia hook --dry-run` without a prompt, which shows the overall code map and memories. Help also shows one prompt example.
 - **`aletheia version`:** for a build from source it adds the module version Go recorded, e.g. `0.1.0 (v0.0.0-20261022130735-0d57de42de32)`, so the commit is known.
 - **Not done:** indexing build and CI files in the code map. Worth a look once the map is measured again.
+
+## 2026-10-22: the third agent setup, after B9
+
+The same project, a new session. Three of B9's points held:
+- **Install:** the `GOPRIVATE` recipe worked; `gh auth setup-git` had already been done there.
+- **Ignored file:** `init` noted the git-ignored CLAUDE.md, in that repo and in a fresh test repo.
+- **Next steps:** `init` printed them, consistent with the guide.
+
+**B10 · friction · two left.**
+1. **Old cached guide.**
+   - **What happened:** WebFetch returned the guide as it was before the last deploy: "go install doesn't work yet", no `GOPRIVATE` step. WebFetch keeps fetched pages for a while.
+   - **Cause:** client-side. Vercel already serves `Cache-Control: public, max-age=0, must-revalidate`.
+2. **"How is this project built" still answered with unrelated files.**
+   - **What happened:** the map showed `internal/corpus/run.go` and `internal/policy/poisoning.go`, matched on "project". go.mod, scripts/, `.gitlab-ci.yml` and `.github/` never showed: the code map indexes declarations, and build files have none.
+
+**Fixed on branch `feat/codemap-build-files`:**
+- **Date line:** the guide opens with "Updated <build date>" and says `curl -fsSL` gets the current text, so an agent can tell a cached copy may be old.
+- **Build files:** the code map records them:
+  - manifests at the root and one folder down (go.mod, package.json, Cargo.toml, pyproject.toml, Makefile, Dockerfile and similar);
+  - `scripts/`;
+  - `.gitlab-ci.yml` and `.goreleaser.yaml`;
+  - `.github/workflows/*`.
+  
+  A prompt about building, testing or shipping, and the overview without a prompt, now start with `build and CI: …`.
+- **Stopwords:** "project", "repo", "repository" and "codebase" are now stopwords, so they no longer pull in files.
+- **Result on this repo:** "how is this project built" leads with `build and CI: .goreleaser.yaml, go.mod, …, .github/workflows/ci.yml, .github/workflows/release.yml`. "add a CLI flag to recall" gets no build line.

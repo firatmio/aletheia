@@ -44,9 +44,34 @@ type Symbol struct {
 
 // Map is the set of declarations in a project.
 type Map struct {
-	Symbols []Symbol
-	Files   int // source files scanned
+	Symbols    []Symbol
+	Files      int      // source files scanned
+	BuildFiles []string // manifests, build scripts and CI config, e.g. go.mod, .github/workflows/ci.yml
 }
+
+// buildNames are files that say how a project is built, tested or shipped.
+// They have no declarations, so they would never show up in the map, yet
+// they are the answer to "how is this built".
+var buildNames = map[string]bool{
+	"go.mod": true, "package.json": true, "cargo.toml": true, "pyproject.toml": true, "setup.py": true,
+	"requirements.txt": true, "pom.xml": true, "build.gradle": true, "build.gradle.kts": true, "gemfile": true,
+	"cmakelists.txt": true, "makefile": true, "justfile": true, "taskfile.yml": true, "dockerfile": true,
+	"docker-compose.yml": true, "docker-compose.yaml": true, "compose.yaml": true,
+	".gitlab-ci.yml": true, ".goreleaser.yml": true, ".goreleaser.yaml": true,
+}
+
+// buildWords in a prompt ask about building, testing or shipping.
+var buildWords = map[string]bool{}
+
+func init() {
+	for _, w := range search.Tokenize("build builds building built compile compiling test tests testing ci cd " +
+		"deploy deploying deployment release releasing install installing lint linting pipeline workflow workflows " +
+		"docker makefile dependencies derle derleme kurulum") {
+		buildWords[w] = true
+	}
+}
+
+const maxBuildFiles = 12
 
 // SuggestedBudget sizes a map to the project: a small project gets none,
 // since an agent reads all of it in a few calls anyway, and the budget grows
@@ -90,11 +115,19 @@ func Build(root string) (*Map, error) {
 			return nil // unreadable entries are skipped, not fatal
 		}
 		name := d.Name()
+		rel, _ := filepath.Rel(root, p)
+		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
 			if p != root && (strings.HasPrefix(name, ".") || skipDirs[name]) {
 				return filepath.SkipDir
 			}
+			if rel == "scripts" {
+				m.BuildFiles = append(m.BuildFiles, "scripts/")
+			}
 			return nil
+		}
+		if buildNames[strings.ToLower(name)] && strings.Count(rel, "/") <= 1 && d.Type()&fs.ModeSymlink == 0 {
+			m.BuildFiles = append(m.BuildFiles, rel)
 		}
 		if d.Type()&fs.ModeSymlink != 0 || !sourceExt[strings.ToLower(filepath.Ext(name))] {
 			return nil
@@ -111,8 +144,6 @@ func Build(root string) (*Map, error) {
 			return nil
 		}
 		files++
-		rel, _ := filepath.Rel(root, p)
-		rel = filepath.ToSlash(rel)
 		if strings.HasSuffix(rel, ".go") {
 			m.Symbols = append(m.Symbols, goSymbols(rel, data)...)
 		} else {
@@ -128,6 +159,15 @@ func Build(root string) (*Map, error) {
 		return nil
 	})
 	m.Files = files
+	// Hidden directories are skipped above; CI workflows are the exception.
+	for _, pattern := range []string{".github/workflows/*.yml", ".github/workflows/*.yaml"} {
+		found, _ := filepath.Glob(filepath.Join(root, filepath.FromSlash(pattern)))
+		for _, f := range found {
+			if rel, err := filepath.Rel(root, f); err == nil {
+				m.BuildFiles = append(m.BuildFiles, filepath.ToSlash(rel))
+			}
+		}
+	}
 	for i := range m.Symbols {
 		s := &m.Symbols[i]
 		name := s.Name
@@ -288,6 +328,12 @@ func (m *Map) Render(query string, budget int) string {
 	if len(weights) == 0 && strings.TrimSpace(query) != "" {
 		return "" // nothing in the prompt says where to look
 	}
+	var b strings.Builder
+	used := 0
+	if line := m.buildLine(weights); line != "" {
+		b.WriteString(line + "\n")
+		used += search.EstimateTokens(line) + 1
+	}
 	if len(weights) > 0 {
 		docs := make([]search.Doc, len(files))
 		for i, f := range files {
@@ -313,8 +359,7 @@ func (m *Map) Render(query string, budget int) string {
 	}
 	sort.SliceStable(files, func(i, j int) bool { return score[files[i]] > score[files[j]] })
 
-	var b strings.Builder
-	used, shown := 0, 0
+	shown := 0
 	for _, f := range files {
 		if score[f] <= 0 || shown >= maxSymbols {
 			break
@@ -348,4 +393,28 @@ func (m *Map) Render(query string, budget int) string {
 		shown += len(items)
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// buildLine lists the build and CI files for an overview (no query) or a
+// prompt about building, testing or shipping:
+//
+//	build and CI: go.mod, Makefile, scripts/, .github/workflows/ci.yml
+func (m *Map) buildLine(weights map[string]float64) string {
+	if len(m.BuildFiles) == 0 {
+		return ""
+	}
+	ask := len(weights) == 0
+	for w := range weights {
+		ask = ask || buildWords[w]
+	}
+	if !ask {
+		return ""
+	}
+	files := m.BuildFiles
+	more := ""
+	if len(files) > maxBuildFiles {
+		more = fmt.Sprintf(" (+%d more)", len(files)-maxBuildFiles)
+		files = files[:maxBuildFiles]
+	}
+	return "build and CI: " + strings.Join(files, ", ") + more
 }
