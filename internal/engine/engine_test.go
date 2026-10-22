@@ -336,6 +336,36 @@ func TestFilesNamedInClaimAreAnchored(t *testing.T) {
 	}
 }
 
+func TestCaptureMapKeepsOneMapPerKindOfChange(t *testing.T) {
+	v := newEnv(t)
+	if err := os.MkdirAll(filepath.Join(v.root, "middleware"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"middleware/a.go", "middleware/a_test.go", "middleware/b.go", "middleware/b_test.go",
+		"context.go", "context_test.go", "README.md"} {
+		v.write(t, f, "x\n")
+	}
+	agent := v.remember(t, RememberInput{Claim: "Middlewares live in middleware/ with one file per middleware", Force: true})
+
+	first, err := v.e.CaptureMap("Add middleware A", []string{"middleware/a.go", "middleware/a_test.go", "README.md"})
+	if err != nil || first == nil || first.Source != CaptureSource || len(first.Anchors) != 3 {
+		t.Fatalf("first map: %+v %v", first, err)
+	}
+	helper, _ := v.e.CaptureMap("Add helper URLParamInt", []string{"context.go", "context_test.go", "README.md"})
+	second, _ := v.e.CaptureMap("Add middleware B", []string{"middleware/b.go", "middleware/b_test.go", "README.md"})
+	if second == nil || len(second.Supersedes) != 1 || second.Supersedes[0] != first.ID {
+		t.Fatalf("the same kind of change should replace the old map: %+v", second)
+	}
+	for _, id := range []string{helper.ID, agent.ID} {
+		if m, _ := v.e.Store.Get(id); m.Status != store.StatusActive {
+			t.Fatalf("%s must stay: a different kind of change, or not a captured map", id)
+		}
+	}
+	if m, _ := v.e.CaptureMap("Read only", []string{"missing.go", "../outside.go"}); m != nil {
+		t.Fatalf("nothing that exists in the project: want no map, got %+v", m)
+	}
+}
+
 func TestUnanchoredRanksBelowVerified(t *testing.T) {
 	v := newEnv(t)
 	v.remember(t, RememberInput{Claim: "Linting runs in CI hint", Force: true})

@@ -1,280 +1,101 @@
-#!/usr/bin/env python3
-"""Generate the animated SVGs used by the README (assets/*.svg).
+"""Generate the README "how it works" diagram (assets/how-it-works-*.svg).
 
-Pure standard library. Animations use SMIL with a shared cycle so every
-element stays in sync and loops forever; SMIL runs inside <img> tags on
-GitHub, unlike scripts. Run from the repo root:
+Pure standard-library Python. Run from the repository root after editing:
 
     python3 scripts/gen_assets.py
+
+The logo files in assets/brand/ are static; see docs/brand/README.md.
 """
-from html import escape
-from pathlib import Path
+import os
+import sys
 
-OUT = Path(__file__).resolve().parent.parent / "assets"
+out = sys.argv[1] if len(sys.argv) > 1 else "assets"
+W, H = 1200, 430
+SANS = "-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+MONO = "ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace"
 
-# Palette: warm parchment + deep ink, teal for truth, amber for staleness.
-INK = "#1f1d2b"
-INK_SOFT = "#4b4860"
-PAPER = "#fbf7ef"
-PAPER_EDGE = "#efe6d4"
-TEAL = "#1f9e8f"
-TEAL_SOFT = "#d6f1ec"
-AMBER = "#e0912f"
-AMBER_SOFT = "#fbe9cf"
-LILAC = "#7b6fd6"
-LILAC_SOFT = "#e6e2fb"
-
-MONO = "ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace"
-SERIF = "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif"
-SANS = "-apple-system, 'Segoe UI', Inter, Helvetica, Arial, sans-serif"
+THEMES = {
+    "light": dict(bg="#f4f6f7", card="#ffffff", rule="#d6dde3", ink="#142033", soft="#4a586c",
+                  ok="#0f7a5a", okbg="#e2f2ec", stale="#a85f00", stalebg="#f8ecd9", code="#0f1724", codeink="#d7deea"),
+    "dark": dict(bg="#0b111b", card="#121a27", rule="#253246", ink="#e5eaf1", soft="#9aa7b8",
+                 ok="#3fc69a", okbg="#10322a", stale="#e3a14a", stalebg="#3a2a12", code="#070b12", codeink="#d7deea"),
+}
 
 
-def owl(x: float, y: float, s: float, blink_dur: float = 6.0) -> str:
-    """An original, geometric owl mascot. (x, y) is the top-left; s scales a 200x200 box."""
-    def lid(cx: float, cy: float) -> str:
-        # Eyelid: a body-coloured ellipse whose height animates closed and open again.
-        return (
-            f'<ellipse cx="{cx}" cy="{cy}" rx="27" ry="0" fill="#5b4e8c">'
-            f'<animate attributeName="ry" dur="{blink_dur}s" repeatCount="indefinite" '
-            f'values="0;0;27;0;0;27;0;0" keyTimes="0;0.55;0.58;0.61;0.86;0.88;0.9;1"/>'
-            f"</ellipse>"
-        )
-
-    return f"""
-<g transform="translate({x} {y}) scale({s})">
-  <g>
-    <animateTransform attributeName="transform" type="translate" dur="4s" repeatCount="indefinite"
-      values="0 0; 0 -4; 0 0" keyTimes="0;0.5;1" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
-    <ellipse cx="100" cy="192" rx="58" ry="6" fill="{INK}" opacity="0.08"/>
-    <path d="M52 52 L44 18 L80 40 Z" fill="#5b4e8c"/>
-    <path d="M148 52 L156 18 L120 40 Z" fill="#5b4e8c"/>
-    <path d="M100 30 C150 30 172 70 172 118 C172 162 140 186 100 186 C60 186 28 162 28 118 C28 70 50 30 100 30 Z" fill="#6d5fa6"/>
-    <path d="M100 96 C134 96 148 124 148 148 C148 172 126 184 100 184 C74 184 52 172 52 148 C52 124 66 96 100 96 Z" fill="{LILAC_SOFT}"/>
-    <g fill="none" stroke="#b9b0ee" stroke-width="3" stroke-linecap="round">
-      <path d="M82 132 q6 7 12 0"/><path d="M106 132 q6 7 12 0"/>
-      <path d="M70 150 q6 7 12 0"/><path d="M94 150 q6 7 12 0"/><path d="M118 150 q6 7 12 0"/>
-      <path d="M84 168 q6 7 12 0"/><path d="M106 168 q6 7 12 0"/>
-    </g>
-    <circle cx="70" cy="84" r="30" fill="{PAPER}"/>
-    <circle cx="130" cy="84" r="30" fill="{PAPER}"/>
-    <circle cx="72" cy="86" r="13" fill="{INK}"/>
-    <circle cx="128" cy="86" r="13" fill="{INK}"/>
-    <circle cx="76" cy="81" r="4" fill="#fff"/>
-    <circle cx="132" cy="81" r="4" fill="#fff"/>
-    {lid(70, 84)}
-    {lid(130, 84)}
-    <path d="M92 104 L108 104 L100 118 Z" fill="{AMBER}"/>
-    <circle cx="48" cy="108" r="7" fill="#f5a3b5" opacity="0.55"/>
-    <circle cx="152" cy="108" r="7" fill="#f5a3b5" opacity="0.55"/>
-  </g>
-  <g transform="translate(150 140)">
-    <circle r="22" fill="{TEAL}">
-      <animate attributeName="r" dur="2.4s" repeatCount="indefinite" values="22;24;22" keyTimes="0;0.5;1"/>
-    </circle>
-    <circle r="22" fill="none" stroke="{TEAL}" stroke-width="3" opacity="0">
-      <animate attributeName="r" dur="2.4s" repeatCount="indefinite" values="22;36" keyTimes="0;1"/>
-      <animate attributeName="opacity" dur="2.4s" repeatCount="indefinite" values="0.5;0" keyTimes="0;1"/>
-    </circle>
-    <path d="M-10 0 L-3 8 L11 -8" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
-</g>"""
+def esc(s):
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def chip_width(label: str, text: str) -> float:
-    return 22 + 8.6 * len(label) + 16 + 7.3 * len(text)
+def text(x, y, s, size=15, fill="ink", weight=400, font=SANS, anchor="start", t=None):
+    return (f'<text x="{x}" y="{y}" font-family="{font}" font-size="{size}" font-weight="{weight}" '
+            f'fill="{t[fill]}" text-anchor="{anchor}">{esc(s)}</text>')
 
 
-def chips(x: float, y: float, items: list, gap: float = 14) -> str:
-    out = []
-    for label, text, fg, bg in items:
-        out.append(chip(x, y, label, text, fg, bg))
-        x += chip_width(label, text) + gap
-    return "".join(out)
+def build(t):
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" role="img" '
+         'aria-label="How Aletheia works: on every prompt it adds verified memories and a code map, '
+         'the agent reads the exact lines, and when the agent stops Aletheia records which files changed.">',
+         f'<rect width="{W}" height="{H}" rx="16" fill="{t["bg"]}"/>',
+         '<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">'
+         f'<path d="M1 1 L9 5 L1 9" fill="none" stroke="{t["soft"]}" stroke-width="1.6"/></marker></defs>']
+    cols = [(40, "1  You send a prompt", "The prompt hook recalls for it."),
+            (430, "2  The agent works", "It starts at the right lines."),
+            (820, "3  The agent stops", "The stop hook records the change.")]
+    for x, title, sub in cols:
+        p.append(f'<rect x="{x}" y="40" width="340" height="300" rx="12" fill="{t["card"]}" stroke="{t["rule"]}"/>')
+        p.append(text(x + 24, 78, title, 18, weight=600, t=t))
+        p.append(text(x + 24, 102, sub, 14, "soft", t=t))
+    # Column 1: what lands in the agent's context.
+    x = 64
+    p.append(f'<rect x="{x}" y="124" width="292" height="190" rx="8" fill="{t["code"]}"/>')
+    rows = [("ok", "New builtin: register in", "registry.go:35-1081"),
+            ("ok", "Arity entry needed in", "builtin_test.go:263"),
+            ("stale", "Builtins live in builtin.go", None)]
+    y = 154
+    for tag, claim, ptr in rows:
+        fill, bg = (t["ok"], t["okbg"]) if tag == "ok" else (t["stale"], t["stalebg"])
+        p.append(f'<rect x="{x + 14}" y="{y - 13}" width="{42 if tag == "ok" else 50}" height="18" rx="4" fill="{bg}"/>')
+        p.append(f'<text x="{x + 21}" y="{y}" font-family="{MONO}" font-size="12" fill="{fill}">{tag}</text>')
+        cx = x + (64 if tag == "ok" else 72)
+        style = ' text-decoration="line-through"' if tag == "stale" else ""
+        p.append(f'<text x="{cx}" y="{y}" font-family="{MONO}" font-size="12" fill="{t["codeink"]}"{style}>{esc(claim)}</text>')
+        if ptr:
+            p.append(f'<text x="{cx}" y="{y + 18}" font-family="{MONO}" font-size="12" fill="{t["ok"]}">{esc(ptr)}</text>')
+        y += 44 if ptr else 30
+    p.append(f'<text x="{x + 14}" y="{y + 4}" font-family="{MONO}" font-size="11" fill="#6f7d91">stale: hidden from the agent</text>')
+    p.append(f'<text x="{x + 14}" y="{y + 30}" font-family="{MONO}" font-size="12" fill="{t["codeink"]}">code map: 4 files, 18 symbols</text>')
+    # Column 2: the read that a pointer buys.
+    x = 454
+    p.append(f'<rect x="{x}" y="124" width="292" height="190" rx="8" fill="{t["code"]}"/>')
+    p.append(f'<text x="{x + 14}" y="148" font-family="{MONO}" font-size="12" fill="#6f7d91">Read builtin/registry.go</text>')
+    p.append(f'<text x="{x + 14}" y="166" font-family="{MONO}" font-size="12" fill="#6f7d91">     lines 35-60, not 1081</text>')
+    for i, line in enumerate(["var Builtins = []*Function{", "    {", '        Name: "abs",', "        Fast: Abs,", "    },"]):
+        yy = 196 + i * 20
+        if i == 0:
+            p.append(f'<rect x="{x + 8}" y="{yy - 14}" width="276" height="20" fill="{t["ok"]}" opacity="0.22"/>')
+        p.append(f'<text xml:space="preserve" x="{x + 14}" y="{yy}" font-family="{MONO}" font-size="12" fill="{t["codeink"]}">{esc(line)}</text>')
+    # Column 3: the map memory written without the agent.
+    x = 844
+    p.append(f'<rect x="{x}" y="124" width="292" height="190" rx="8" fill="{t["code"]}"/>')
+    lines = [("#6f7d91", "saved from the transcript:"), (t["codeink"], 'Map: a task like "Add a new'),
+             (t["codeink"], 'builtin sign(x)" changed'), (t["ok"], "builtin/registry.go,"),
+             (t["ok"], "builtin/lib.go, docs, tests"), ("#6f7d91", "anchors: exists: each file"),
+             ("#6f7d91", "agent turns spent: 0")]
+    for i, (c, s) in enumerate(lines):
+        p.append(f'<text x="{x + 14}" y="{148 + i * 22}" font-family="{MONO}" font-size="12" fill="{c}">{esc(s)}</text>')
+    # Arrows between the steps and the loop back.
+    for x1 in (380, 770):
+        p.append(f'<line x1="{x1 + 4}" y1="190" x2="{x1 + 46}" y2="190" stroke="{t["soft"]}" stroke-width="1.6" marker-end="url(#ah)"/>')
+    p.append(f'<path d="M990 340 V378 Q990 392 976 392 H224 Q210 392 210 378 V346" fill="none" stroke="{t["soft"]}" '
+             f'stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#ah)"/>')
+    p.append(f'<rect x="420" y="380" width="360" height="26" rx="13" fill="{t["bg"]}"/>')
+    p.append(text(600, 398, "every recall re-checks the anchors against your files", 13, "soft", anchor="middle", t=t))
+    p.append("</svg>\n")
+    return "".join(p)
 
 
-def chip(x: float, y: float, label: str, text: str, fg: str, bg: str) -> str:
-    w = chip_width(label, text)
-    return f"""
-<g transform="translate({x} {y})">
-  <rect width="{w:.0f}" height="34" rx="17" fill="{bg}"/>
-  <text x="16" y="22.5" font-family="{MONO}" font-size="14" font-weight="700" fill="{fg}">{escape(label)}</text>
-  <text x="{22 + 8.6 * len(label):.0f}" y="22.5" font-family="{SANS}" font-size="14" fill="{INK_SOFT}">{escape(text)}</text>
-</g>"""
-
-
-def banner() -> str:
-    w, h = 1280, 360
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img" aria-label="Aletheia: memory for AI agents that checks itself against reality">
-  <title>Aletheia</title>
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="{PAPER}"/><stop offset="1" stop-color="{PAPER_EDGE}"/>
-    </linearGradient>
-    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
-      <circle cx="2" cy="2" r="1.3" fill="{INK}" opacity="0.07"/>
-    </pattern>
-  </defs>
-  <rect width="{w}" height="{h}" rx="28" fill="url(#bg)"/>
-  <rect width="{w}" height="{h}" rx="28" fill="url(#dots)"/>
-  <circle cx="1160" cy="40" r="120" fill="{TEAL_SOFT}" opacity="0.7"/>
-  <circle cx="1230" cy="330" r="90" fill="{LILAC_SOFT}" opacity="0.8"/>
-  {owl(70, 70, 1.1)}
-  <text x="350" y="150" font-family="{SERIF}" font-size="92" font-weight="700" fill="{INK}" letter-spacing="-1">Aletheia</text>
-  <text x="352" y="196" font-family="{SANS}" font-size="26" fill="{INK_SOFT}">Memory for AI agents that checks itself against reality.</text>
-  {chips(352, 236, [
-      ("[ok]", "verified against your files", TEAL, TEAL_SOFT),
-      ("[?]", "hint, no evidence", LILAC, LILAC_SOFT),
-      ("stale", "hidden before it misleads", "#b26a12", AMBER_SOFT),
-  ])}
-  <text x="352" y="316" font-family="{SERIF}" font-style="italic" font-size="18" fill="{INK_SOFT}" opacity="0.85">a·lḗtheia (ἀλήθεια): truth, literally “un-forgetting”</text>
-</svg>
-"""
-
-
-# --- animated terminal --------------------------------------------------------
-
-CYCLE = 24.0  # seconds for one loop
-CHAR_W = 8.7  # approximate monospace advance at 14.5px
-LINE_H = 25
-
-# (kind, segments, start_time)
-#   kind "cmd": typed out; segments rendered after a "$ " prompt
-#   kind "out": appears at once
-#   kind "note": a comment line between steps
-SCRIPT = [
-    ("cmd", [("aletheia remember ", "#e8e6f0"), ('"Service targets Go 1.23" ', "#f3d9a4"), ("--anchor file:go.mod", "#9fd6ce")], 0.6),
-    ("out", [("saved ", "#a9a6b8"), ("9e4426 ", "#e8e6f0"), ("[ok] ", "#5fd3a8"), ("Service targets Go 1.23", "#e8e6f0")], 3.4),
-    ("cmd", [("aletheia recall ", "#e8e6f0"), ('"go version"', "#f3d9a4")], 4.6),
-    ("out", [("9e4426 ", "#e8e6f0"), ("[ok] ", "#5fd3a8"), ("Service targets Go 1.23", "#e8e6f0")], 6.4),
-    ("note", [("# a teammate bumps go.mod to 1.24 …", "#7d7a91")], 7.8),
-    ("cmd", [("aletheia recall ", "#e8e6f0"), ('"go version"', "#f3d9a4")], 9.2),
-    ("out", [("(+1 stale hidden: 9e4426)", "#f0b35b")], 11.0),
-    ("cmd", [("aletheia get 9e4426", "#e8e6f0")], 12.4),
-    ("out", [("9e4426 ", "#e8e6f0"), ("[stale: go.mod: changed] ", "#f0b35b"), ("Service targets Go 1.23", "#a9a6b8")], 14.0),
-    ("cmd", [("aletheia remember ", "#e8e6f0"), ('"Service targets Go 1.24" ', "#f3d9a4"), ("--anchor file:go.mod --supersedes 9e4426", "#9fd6ce")], 15.4),
-    ("out", [("saved ", "#a9a6b8"), ("51b0c7 ", "#e8e6f0"), ("[ok] ", "#5fd3a8"), ("Service targets Go 1.24", "#e8e6f0")], 19.4),
-    ("out", [("superseded: 9e4426", "#a9a6b8")], 19.7),
-]
-TYPE_SPEED = 0.038  # seconds per character
-HOLD_END = 22.6     # everything fades out from here
-FADE_END = 23.4
-
-
-def kt(t: float) -> str:
-    return f"{max(0.0, min(1.0, t / CYCLE)):.4f}"
-
-
-def terminal() -> str:
-    w = 980
-    top = 58
-    h = top + LINE_H * len(SCRIPT) + 30
-    rows = []
-    for i, (kind, segs, start) in enumerate(SCRIPT):
-        y = top + 18 + i * LINE_H
-        x0 = 28
-        text = "".join(s for s, _ in segs)
-        spans = "".join(f'<tspan fill="{c}">{escape(s)}</tspan>' for s, c in segs)
-        # Visibility of the whole row over the cycle.
-        vis = (
-            f'<animate attributeName="opacity" dur="{CYCLE}s" repeatCount="indefinite" '
-            f'values="0;0;1;1;0;0" keyTimes="0;{kt(start)};{kt(start + 0.01)};{kt(HOLD_END)};{kt(FADE_END)};1"/>'
-        )
-        if kind == "cmd":
-            prompt = f'<text x="{x0}" y="{y}" font-family="{MONO}" font-size="14.5" fill="#5fd3a8">$</text>'
-            tx = x0 + 2 * CHAR_W
-            full = len(text) * CHAR_W + 4
-            typed_end = start + len(text) * TYPE_SPEED
-            clip_id = f"c{i}"
-            rows.append(
-                f'<clipPath id="{clip_id}"><rect x="{tx}" y="{y - 16}" height="22" width="0">'
-                f'<animate attributeName="width" dur="{CYCLE}s" repeatCount="indefinite" '
-                f'values="0;0;{full:.0f};{full:.0f};0" keyTimes="0;{kt(start)};{kt(typed_end)};{kt(FADE_END)};1"/>'
-                f"</rect></clipPath>"
-                f'<g opacity="0">{vis}{prompt}'
-                f'<text x="{tx}" y="{y}" font-family="{MONO}" font-size="14.5" clip-path="url(#{clip_id})" xml:space="preserve">{spans}</text></g>'
-            )
-        else:
-            style = ' font-style="italic"' if kind == "note" else ""
-            rows.append(
-                f'<g opacity="0">{vis}<text x="{x0}" y="{y}" font-family="{MONO}" font-size="14.5"{style} xml:space="preserve">{spans}</text></g>'
-            )
-    # Cursor: at the end of a command while it is typed, then on the empty
-    # line below the latest output.
-    cursor_vals, cursor_keys = [], []
-    for i, (kind, segs, start) in enumerate(SCRIPT):
-        if kind == "cmd":
-            n = len("".join(s for s, _ in segs))
-            cursor_keys.append(kt(start + n * TYPE_SPEED))
-            cursor_vals.append(f"{(n + 2) * CHAR_W + 4:.0f} {i * LINE_H}")
-        cursor_keys.append(kt(start + (n * TYPE_SPEED if kind == "cmd" else 0) + 0.02))
-        cursor_vals.append(f"0 {(i + 1) * LINE_H}")
-    cursor = (
-        f'<rect x="{28}" y="{top + 4}" width="9" height="17" rx="2" fill="#5fd3a8" opacity="0.85">'
-        f'<animateTransform attributeName="transform" type="translate" dur="{CYCLE}s" repeatCount="indefinite" calcMode="discrete" '
-        f'values="{";".join(["0 0"] + cursor_vals)}" keyTimes="{";".join(["0"] + cursor_keys)}"/>'
-        f'<animate attributeName="opacity" dur="1s" repeatCount="indefinite" values="0.85;0;0.85" keyTimes="0;0.5;1" calcMode="discrete"/>'
-        f"</rect>"
-    )
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img" aria-label="Terminal demo: a memory is verified, goes stale when go.mod changes, is hidden from recall, and is superseded">
-  <title>Aletheia demo</title>
-  <rect width="{w}" height="{h}" rx="16" fill="#1d1b26"/>
-  <rect width="{w}" height="40" rx="16" fill="#26233a"/>
-  <rect y="24" width="{w}" height="16" fill="#26233a"/>
-  <circle cx="24" cy="20" r="6" fill="#ff6b6b"/><circle cx="44" cy="20" r="6" fill="#ffc24b"/><circle cx="64" cy="20" r="6" fill="#4cd07d"/>
-  <text x="{w / 2}" y="25" text-anchor="middle" font-family="{SANS}" font-size="13" fill="#8e8aa6">aletheia · stale memory never reaches the context</text>
-  {cursor}
-  {"".join(rows)}
-</svg>
-"""
-
-
-def states() -> str:
-    """Three-card diagram of the freshness states."""
-    w, h = 980, 210
-    cards = [
-        (TEAL, TEAL_SOFT, "[ok]", "verified", "Every anchor still holds against", "the files right now."),
-        (LILAC, LILAC_SOFT, "[?]", "unanchored", "No evidence attached: a hint,", "ranked below verified facts."),
-        ("#b26a12", AMBER_SOFT, "stale", "hidden", "An anchor failed or it expired.", "Kept on disk, never sent."),
-    ]
-    out = []
-    cw, gap = 300, 30
-    for i, (fg, bg, tag, name, l1, l2) in enumerate(cards):
-        x = 10 + i * (cw + gap)
-        out.append(f"""
-<g transform="translate({x} 10)">
-  <rect width="{cw}" height="{h - 20}" rx="18" fill="{bg}"/>
-  <rect x="22" y="24" width="{24 + 10 * len(tag)}" height="32" rx="10" fill="#fff"/>
-  <text x="34" y="46" font-family="{MONO}" font-size="16" font-weight="700" fill="{fg}">{escape(tag)}</text>
-  <text x="22" y="98" font-family="{SERIF}" font-size="28" font-weight="700" fill="{INK}">{escape(name)}</text>
-  <text x="22" y="134" font-family="{SANS}" font-size="14.5" fill="{INK_SOFT}">{escape(l1)}</text>
-  <text x="22" y="156" font-family="{SANS}" font-size="14.5" fill="{INK_SOFT}">{escape(l2)}</text>
-</g>""")
-    arrows = []
-    for i in range(2):
-        x = 10 + (i + 1) * cw + i * gap + 8
-        arrows.append(f'<path d="M{x} {h / 2} h{gap - 16}" stroke="{INK_SOFT}" stroke-width="2" stroke-dasharray="4 4" opacity="0.5"/>')
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img" aria-label="Freshness states: verified, unanchored, stale">
-  <title>Freshness states</title>
-  {"".join(arrows)}{"".join(out)}
-</svg>
-"""
-
-
-def mascot() -> str:
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 220 220" role="img" aria-label="Aletheia owl">
-  <title>Aletheia owl</title>
-  {owl(10, 10, 1.0)}
-</svg>
-"""
-
-
-def main() -> None:
-    OUT.mkdir(exist_ok=True)
-    files = {"banner.svg": banner(), "demo.svg": terminal(), "states.svg": states(), "owl.svg": mascot()}
-    for name, svg in files.items():
-        (OUT / name).write_text(svg, encoding="utf-8")
-        print(f"wrote assets/{name} ({len(svg.encode()):,} bytes)")
-
-
-if __name__ == "__main__":
-    main()
+for name, t in THEMES.items():
+    path = os.path.join(out, f"how-it-works-{name}.svg")
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(build(t))
+    print(path)

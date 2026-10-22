@@ -239,7 +239,7 @@ func TestHookAddsCodeMapOncePerSession(t *testing.T) {
 		t.Helper()
 		in, _ := json.Marshal(map[string]string{"prompt": prompt, "session_id": "s-map", "cwd": dir})
 		var out, errb bytes.Buffer
-		run([]string{"hook"}, bytes.NewReader(in), &out, &errb)
+		run([]string{"hook", "--map-budget", "300"}, bytes.NewReader(in), &out, &errb) // the project is tiny
 		return out.String()
 	}
 	if out := hook("fold constants in the optimizer"); !strings.Contains(out, "Code map for this prompt") ||
@@ -251,5 +251,97 @@ func TestHookAddsCodeMapOncePerSession(t *testing.T) {
 	}
 	if code, out, _ := runCLI(t, dir, "", "map", "fold"); code != 0 || !strings.Contains(out, "fold.go: FoldConstants 3") {
 		t.Fatalf("map command: %d %q", code, out)
+	}
+}
+
+func TestHookSkipsCodeMapForTinyProjects(t *testing.T) {
+	t.Setenv("ALETHEIA_DIR", "")
+	dir := t.TempDir()
+	writeFile(t, dir, "fold.go", "package x\n\nfunc FoldConstants() {}\n")
+	runCLI(t, dir, "", "init")
+	in, _ := json.Marshal(map[string]string{"prompt": "fold constants", "session_id": "s-tiny", "cwd": dir})
+	var out, errb bytes.Buffer
+	run([]string{"hook"}, bytes.NewReader(in), &out, &errb)
+	if out.Len() != 0 {
+		t.Fatalf("a one-file project needs no map: %q", out.String())
+	}
+}
+
+func TestStopHookCapturesWhereTasksChangedFiles(t *testing.T) {
+	t.Setenv("ALETHEIA_DIR", "")
+	dir := t.TempDir()
+	for _, p := range []string{"middleware", "docs"} {
+		if err := os.MkdirAll(filepath.Join(dir, p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeFile(t, dir, "middleware/require_header.go", "package middleware\n")
+	writeFile(t, dir, "middleware/require_header_test.go", "package middleware\n")
+	writeFile(t, dir, "README.md", "# x\n")
+	runCLI(t, dir, "", "init")
+
+	abs := func(p string) string { return filepath.Join(dir, filepath.FromSlash(p)) }
+	lines := []any{
+		map[string]any{"type": "user", "message": map[string]any{"content": "Add a RequireHeader middleware that answers 400"}},
+		map[string]any{"type": "user", "isMeta": true, "message": map[string]any{"content": "hook context"}},
+		map[string]any{"type": "assistant", "message": map[string]any{"content": []any{
+			map[string]any{"type": "tool_use", "name": "Read", "input": map[string]any{"file_path": abs("README.md")}},
+			map[string]any{"type": "tool_use", "name": "Write", "input": map[string]any{"file_path": abs("middleware/require_header.go")}},
+		}}},
+		map[string]any{"type": "user", "message": map[string]any{"content": []any{map[string]any{"type": "tool_result", "content": "ok"}}}},
+		map[string]any{"type": "assistant", "message": map[string]any{"content": []any{
+			map[string]any{"type": "tool_use", "name": "Edit", "input": map[string]any{"file_path": abs("middleware/require_header_test.go")}},
+			map[string]any{"type": "tool_use", "name": "Edit", "input": map[string]any{"file_path": "README.md"}},
+			map[string]any{"type": "tool_use", "name": "Edit", "input": map[string]any{"file_path": filepath.Join(filepath.Dir(dir), "outside.go")}},
+			map[string]any{"type": "tool_use", "name": "Edit", "input": map[string]any{"file_path": abs("middleware/deleted.go")}},
+		}}},
+	}
+	transcript := filepath.Join(t.TempDir(), "session.jsonl")
+	appendLines := func(ls []any) {
+		t.Helper()
+		f, err := os.OpenFile(transcript, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		for _, l := range ls {
+			data, _ := json.Marshal(l)
+			f.Write(append(data, '\n'))
+		}
+	}
+	stop := func() string {
+		t.Helper()
+		in, _ := json.Marshal(map[string]string{"hook_event_name": "Stop", "session_id": "s-stop", "cwd": dir, "transcript_path": transcript})
+		var out, errb bytes.Buffer
+		if code := run([]string{"hook"}, bytes.NewReader(in), &out, &errb); code != 0 || out.Len() > 0 || errb.Len() > 0 {
+			t.Fatalf("the Stop hook must stay silent: %d %q %q", code, out.String(), errb.String())
+		}
+		_, recall, _ := runCLI(t, dir, "", "recall", "--limit", "20")
+		return recall
+	}
+
+	appendLines(lines)
+	got := stop()
+	want := `[ok] Map: a task like "Add a RequireHeader middleware that answers 400" changed ` +
+		`middleware/require_header.go, middleware/require_header_test.go, README.md`
+	if !strings.Contains(got, want) || strings.Contains(got, "outside.go") || strings.Contains(got, "deleted.go") {
+		t.Fatalf("captured map:\n%s", got)
+	}
+	if again := stop(); strings.Count(again, "Map:") != 1 {
+		t.Fatalf("an unchanged transcript adds nothing:\n%s", again)
+	}
+
+	// The next task of the same kind replaces the captured map instead of piling up.
+	writeFile(t, dir, "middleware/no_index.go", "package middleware\n")
+	appendLines([]any{
+		map[string]any{"type": "user", "message": map[string]any{"content": "Add a NoIndex middleware that answers with a header"}},
+		map[string]any{"type": "assistant", "message": map[string]any{"content": []any{
+			map[string]any{"type": "tool_use", "name": "Write", "input": map[string]any{"file_path": abs("middleware/no_index.go")}},
+			map[string]any{"type": "tool_use", "name": "Edit", "input": map[string]any{"file_path": abs("README.md")}},
+		}}},
+	})
+	got = stop()
+	if strings.Count(got, "Map:") != 1 || !strings.Contains(got, "middleware/no_index.go, README.md") {
+		t.Fatalf("want the newer map only:\n%s", got)
 	}
 }
