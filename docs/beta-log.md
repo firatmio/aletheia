@@ -28,7 +28,7 @@ At the end of each week, also log `aletheia verify` and `aletheia stats`.
 
 **B1 · friction · upgrading on Windows while the MCP server runs.**
 - **What happened:** `go install` failed with "file in use": the running `aletheia serve` holds `aletheia.exe`, and Windows does not let a running exe be overwritten. Renaming the old exe first works, because Windows allows renaming a running exe.
-- **Follow-up:** add an upgrade note for Windows to the README and `/agents.md`: stop the agent first, or rename the old binary. The MCP server keeps running the old version until the agent restarts.
+- **Follow-up:** done on branch `docs/windows-upgrade`. The README's quick start and `/agents.md` now have an upgrade note: quit the agent, or rename the old binary and install. The MCP server keeps running the old version until the agent restarts.
 
 **B2 · recall · recalled memories off topic, code map on target.**
 - **What happened:** the prompt was "how does the stop hook capture task maps".

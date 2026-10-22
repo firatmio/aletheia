@@ -23,6 +23,15 @@ ${site.install}
 aletheia version
 \`\`\`
 
+**Upgrading:** run the same \`go install\` again.
+- **On Windows,** a running agent's MCP server keeps \`aletheia.exe\` open, so the install fails with "file in use". Do not retry in a loop. Rename the old binary first (Windows allows renaming a running exe), then install:
+
+\`\`\`powershell
+Rename-Item "$(go env GOPATH)\\bin\\aletheia.exe" aletheia-old.exe
+\`\`\`
+
+- **Which version runs:** the hooks use the new binary right away; the MCP server keeps the old one until the agent restarts.
+
 ## 2. Set up the project (once, in the project root)
 
 \`\`\`bash
