@@ -1,6 +1,11 @@
 /* Grounds and surfaces are neutral grays; color only carries meaning:
    ok = evidence holds, stale = evidence broke, bad = the ghost's failures,
    ptr = file:line pointers and code keywords. Dark is the default. */
+/* Newsreader and IBM Plex come from @fontsource (entry-client.tsx). GFS Didot,
+   for the Greek, is served from /fonts (OFL 1.1, see fonts/LICENSE.md). */
+@font-face { font-family: "GFS Didot"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/gfs-didot-400-greek-ext.woff2") format("woff2"); unicode-range: U+1F00-1FFF; }
+@font-face { font-family: "GFS Didot"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/gfs-didot-400-greek.woff2") format("woff2"); unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF; }
+
 :root {
   --ground: #0a0a0a; --surface: #141414; --raised: #1c1c1c; --line: #2a2a2a; --ghost: #101010;
   --dim: #8a8a8a; --soft: #a3a3a3; --text: #f5f5f5; --on-accent: #0a0a0a;
@@ -9,6 +14,7 @@
   --display: "Newsreader", "Iowan Old Style", Georgia, serif;
   --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --greek: "GFS Didot", "Noto Serif", "Palatino Linotype", serif;
   --term-h: min(620px, 76vh);
   --peek: 220px;
   color-scheme: dark;
@@ -67,9 +73,14 @@ button { font: inherit; }
 .navlinks { display: flex; align-items: center; gap: 24px; font-size: 14px; color: var(--soft); }
 .navlinks a { text-decoration: none; white-space: nowrap; }
 .navlinks a:hover { color: var(--text); }
-.pill { white-space: nowrap; font-size: 12px; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; }
-.icon-btn { width: 36px; height: 36px; display: grid; place-items: center; background: transparent; border: 1px solid var(--line); border-radius: 8px; color: var(--soft); cursor: pointer; }
-.icon-btn:hover { color: var(--text); }
+/* The pill and the theme button sit on the painting: a frosted ground keeps
+   them legible, and they share one height. */
+.pill, .icon-btn { --glass: color-mix(in srgb, var(--surface) 72%, transparent); height: 36px; background: var(--glass); border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: var(--soft); transition: color 0.2s, border-color 0.2s; }
+.pill { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 13px; border-radius: 999px; padding: 0 14px; text-decoration: none; }
+.pill-note { color: var(--dim); }
+.pill .gh { flex: none; color: var(--text); }
+a.pill:hover, .icon-btn:hover { color: var(--text); border-color: color-mix(in srgb, var(--text) 28%, transparent); }
+.icon-btn { width: 36px; display: grid; place-items: center; border-radius: 999px; cursor: pointer; }
 
 /* Buttons */
 .btn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid var(--line); font-weight: 500; font-size: 14px; text-decoration: none; color: var(--text); }
@@ -78,7 +89,7 @@ button { font: inherit; }
 .copy:hover { color: var(--text); }
 
 /* Hero: the terminal of the story section peeks over its bottom edge. */
-.hero { position: relative; min-height: 100svh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center; padding-top: 120px; padding-bottom: calc(var(--peek) + 80px); }
+.hero { position: relative; overflow-x: clip; min-height: 100svh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center; padding-top: 120px; padding-bottom: calc(var(--peek) + 80px); }
 h1 { margin: 0; font: 400 clamp(46px, 7.4vw, 88px)/1 var(--display); letter-spacing: -0.02em; text-wrap: balance; }
 h1 em { font-style: italic; }
 .lede { margin: 0; max-width: 620px; font-size: 18px; color: var(--soft); }
@@ -86,6 +97,20 @@ h1 em { font-style: italic; }
 .install { display: flex; align-items: center; gap: 12px; max-width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 6px 6px 14px; }
 .install code { font-size: 13px; white-space: nowrap; overflow-x: auto; min-width: 0; }
 .soon { margin: -8px 0 0; font-size: 13px; color: var(--dim); }
+/* Puvis de Chavannes, The Sacred Grove (1884–89), in gray behind the hero,
+   fading down into the page. It comes into focus on load: ἀλήθεια is
+   un-concealment. A small lens around the pointer shows it in color. */
+main { position: relative; }
+.hero > * { position: relative; z-index: 1; }
+.hero-art { --art-o: 0.22; --lens-o: 0.6; position: absolute; z-index: 0; top: 0; left: 0; right: 0; height: min(100svh, 62vw); pointer-events: none; filter: blur(2px); -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 92%); mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 92%); animation: unconceal 2.6s cubic-bezier(0.2, 0.6, 0.2, 1) both; }
+:root[data-theme="light"] .hero-art { --art-o: 0.16; --lens-o: 0.4; }
+.hero-art > div { position: absolute; inset: 0; background: radial-gradient(ellipse 34% 42% at 50% 46%, var(--ground), transparent), url("/sacred-grove.webp") center 35% / cover no-repeat; }
+.hero-art .gray { opacity: var(--art-o); }
+.hero-art .lens { background-image: radial-gradient(ellipse 34% 42% at 50% 46%, var(--ground), transparent), url("/sacred-grove-color.webp"); opacity: 0; transition: opacity 0.5s ease; -webkit-mask-image: radial-gradient(circle 130px at var(--mx, -500px) var(--my, -500px), #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%); mask-image: radial-gradient(circle 130px at var(--mx, -500px) var(--my, -500px), #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%); }
+.hero-art.lit .lens { opacity: var(--lens-o); }
+@keyframes unconceal { from { filter: blur(18px); opacity: 0; } to { filter: blur(2px); opacity: 1; } }
+.gloss { margin: 6px 0 0; max-width: 560px; font: italic 400 15px/1.5 var(--display); color: var(--dim); }
+.gloss [lang="grc"] { font-family: var(--greek); font-style: normal; color: var(--soft); }
 .cue { position: absolute; left: 0; right: 0; bottom: calc(var(--peek) + 24px); margin: 0; font: 400 12px/1 var(--mono); color: var(--dim); }
 
 /* Story */
@@ -219,6 +244,8 @@ h3 { margin: 0; font: 400 28px/1.15 var(--display); }
 footer { margin-top: 96px; border-top: 1px solid var(--line); }
 .foot { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-block: 24px 40px; font-size: 13px; color: var(--dim); }
 .foot a { color: var(--soft); }
+.credit { margin-top: -24px; padding-bottom: 40px; font-size: 12px; color: var(--dim); }
+.credit a { color: inherit; text-decoration-color: var(--line); }
 
 @media (max-width: 880px) {
   :root { --peek: 160px; }
@@ -239,6 +266,7 @@ footer { margin-top: 96px; border-top: 1px solid var(--line); }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .mark.drop .psili { animation: none; }
+  .hero-art { animation: none; }
   .story { height: auto; margin-top: 0; pointer-events: auto; }
   .story-sticky { position: static; height: auto; display: flex; flex-direction: column; align-items: center; gap: 16px; padding-block: 24px; overflow: visible; }
   .story-bar, .rail, .captions, .hud-ctrl, .rename .chip { display: none; }

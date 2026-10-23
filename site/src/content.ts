@@ -21,6 +21,9 @@ export const hero = {
   notReleased: "The source opens soon. The command works from launch day.",
   cta: "Watch it work",
   cue: "scroll to watch an agent work with Aletheia",
+  // The word behind the hero, and its dictionary entry.
+  word: "ἀλήθεια",
+  gloss: { translit: "alētheia", sense: "truth; literally un-forgetting, from ἀ- “not” and λήθη “forgetting”" },
 };
 
 // --- The scroll story -------------------------------------------------------
@@ -243,4 +246,10 @@ export const footer = {
   left: "Apache-2.0 · written in Go, zero dependencies",
   agents: "For agents:",
   right: "Fırat Tuna Arslan",
+  credit: {
+    before: "Behind the title: Pierre Puvis de Chavannes, ",
+    title: "The Sacred Grove, Beloved of the Arts and the Muses",
+    after: " (1884–89), Art Institute of Chicago. Public domain.",
+    href: "https://commons.wikimedia.org/wiki/File:Pierre_Puvis_de_Chavannes_-_The_Sacred_Grove,_Beloved_of_the_Arts_and_the_Muses_-_1922.445_-_Art_Institute_of_Chicago.jpg",
+  },
 };
