@@ -26,7 +26,9 @@ const instructions = "Verified project memory. recall before exploring the codeb
 
 // Server serves one engine over a reader/writer pair.
 type Server struct {
-	Engine  *engine.Engine
+	Engine *engine.Engine
+	// Open, when Engine is nil, is tried on each tool call until it succeeds.
+	Open    func() (*engine.Engine, error)
 	Version string
 	In      io.Reader
 	Out     io.Writer
@@ -284,6 +286,27 @@ func textResult(text string, isErr bool) map[string]any {
 	return r
 }
 
+// engine opens the store on first use when the server started without one
+// (Open set, Engine nil). A plugin starts the server in every project, so a
+// project without .aletheia/ gets a hint instead of a failed server, and the
+// tools work as soon as someone runs init, without a restart.
+func (s *Server) engine() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.Engine != nil {
+		return nil
+	}
+	if s.Open == nil {
+		return errors.New("no store")
+	}
+	e, err := s.Open()
+	if err != nil {
+		return fmt.Errorf("%w, then call this tool again", err)
+	}
+	s.Engine = e
+	return nil
+}
+
 func (s *Server) callTool(params json.RawMessage) (map[string]any, *rpcError) {
 	var p struct {
 		Name      string          `json:"name"`
@@ -297,6 +320,9 @@ func (s *Server) callTool(params json.RawMessage) (map[string]any, *rpcError) {
 		args = json.RawMessage("{}")
 	}
 	fail := func(err error) (map[string]any, *rpcError) { return textResult(err.Error(), true), nil }
+	if err := s.engine(); err != nil {
+		return fail(err)
+	}
 
 	switch p.Name {
 	case "recall":

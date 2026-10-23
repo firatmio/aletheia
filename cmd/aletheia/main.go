@@ -876,11 +876,18 @@ func (c *cli) serve(args []string) int {
 	if err != nil {
 		return c.usageErr(err)
 	}
+	srv := &mcp.Server{Version: version, In: c.in, Out: c.out}
 	e, err := c.open(f)
-	if err != nil {
+	switch {
+	case err == nil:
+		srv.Engine = e
+	case errors.Is(err, store.ErrNoStore):
+		// Started by a plugin in a project without .aletheia/: serve anyway, so
+		// the tools can say what to do, and open the store once it exists.
+		srv.Open = func() (*engine.Engine, error) { return c.open(f) }
+	default:
 		return c.fail(err)
 	}
-	srv := &mcp.Server{Engine: e, Version: version, In: c.in, Out: c.out}
 	if err := srv.Serve(); err != nil {
 		return c.fail(err)
 	}

@@ -551,3 +551,14 @@ func TestStopHookCapturesWhereTasksChangedFiles(t *testing.T) {
 		t.Fatalf("want the newer map only:\n%s", got)
 	}
 }
+
+func TestServeStartsWithoutAStore(t *testing.T) {
+	// A Claude Code plugin starts the server in every project; one without
+	// .aletheia/ must get a working server that says what to do.
+	dir := t.TempDir()
+	stdin := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"recall","arguments":{"query":"x"}}}` + "\n"
+	code, out, errOut := runCLI(t, dir, stdin, "serve")
+	if code != 0 || !strings.Contains(out, "aletheia init") || !strings.Contains(out, `"isError":true`) {
+		t.Fatalf("serve without a store: code %d, out %q, err %q", code, out, errOut)
+	}
+}

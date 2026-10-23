@@ -92,6 +92,35 @@ func TestToolSchemaStaysSmall(t *testing.T) {
 	}
 }
 
+func TestServerWithoutStoreHintsAndOpensItLater(t *testing.T) {
+	root := t.TempDir()
+	srv := &Server{Version: "test", Open: func() (*engine.Engine, error) {
+		s, err := store.Open(root)
+		if err != nil {
+			return nil, err
+		}
+		return engine.New(s), nil
+	}}
+	call := json.RawMessage(`{"name":"recall","arguments":{"query":"anything"}}`)
+
+	res, rerr := srv.callTool(call)
+	if rerr != nil || res["isError"] != true || !strings.Contains(textOf(res), "aletheia init") {
+		t.Fatalf("a project without a store should get a hint, not a dead server: %v %v", res, rerr)
+	}
+
+	if _, _, err := store.Init(root); err != nil {
+		t.Fatal(err)
+	}
+	res, rerr = srv.callTool(call)
+	if rerr != nil || res["isError"] == true || srv.Engine == nil {
+		t.Fatalf("after init the tools should work without a restart: %v %v", res, rerr)
+	}
+}
+
+func textOf(res map[string]any) string {
+	return res["content"].([]map[string]any)[0]["text"].(string)
+}
+
 func TestRememberRecallOverMCP(t *testing.T) {
 	e := newEngine(t)
 	resp := exchange(t, e,
