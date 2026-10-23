@@ -17,7 +17,7 @@ Why this gap exists (researched 2026-10-21):
 - Mem0, Zep/Graphiti, Letta, Cognee, Supermemory compete on *storing and retrieving*. Benchmarks (LoCoMo, LongMemEval) measure recall, not whether recalled facts are still true.
 - Similarity search ranks a stale fact as high as its replacement ("ghost context"). The STALE study found most agents fail to notice supersession. A memory that keeps a conclusion but drops its source becomes "confidently uncorrectable".
 - Basic Memory already does "Markdown + MCP + SQLite index". That stack alone is **not** novel; the verification layer is.
-- Name check: "cairn" and "muninn" are taken by several agent-memory projects; "aletheia" had no memory-project collision found via web search (GitHub search API was unavailable, so re-check before launch).
+- Name check: "cairn" and "muninn" are taken by several agent-memory projects; "aletheia" had no memory-project collision found via web search (GitHub search API was unavailable, so re-check before launch). Re-checked on 2026-10-23, and the name is kept; see 4.3.1.
 
 Positioning line: *"Memory that checks itself against reality."* Greek a-lḗtheia = "un-forgetting"; the GC command is named `lethe` (river of forgetting).
 
@@ -143,7 +143,13 @@ Status 2026-10-22: the snapshot works (goreleaser v2.10.2 in Docker).
 **Name check (2026-10-23):**
 - **Google DeepMind's "Aletheia"** (Feb 2026) is a math research agent and the best-known AI use of the name.
 - **Small GitHub repos:** `khaledgabal2/aletheia-memory` ("Local, auditable memory for AI agents", 2 stars) and two other `aletheia-memory` repos with no stars.
-- **Open:** keep the name or not. That is Fırat's call.
+- **Alternatives checked:**
+  - Already used by AI memory or MCP tools: Mneme, Mnemon (a single Go binary, Apache-2.0, close to ours), Anamnesis (a Claude Code memory layer), Stele (hosted agent memory with a prompt hook) and Elenchus (verification MCPs).
+  - Clean but weaker: Tekmerion ("conclusive evidence", hard to read), Gnomon (the silent g) and Pistis (its everyday sense is "faith").
+- **Decision (Fırat, 2026-10-23): keep Aletheia.**
+  - No coding-agent memory tool uses the name, and DeepMind's agent is in another field.
+  - The meaning carries the brand: ἀ-λήθεια, the opposite of Lethe (forgetting).
+  - If asked on HN: a different field, and the name means un-forgetting.
 
 **Go-live, in order. Each outward step needs Fırat's go-ahead:**
 1. Create the public repos `firatmio/scoop-bucket` and `firatmio/homebrew-tap`. Fırat creates a fine-grained token with write access to them as `TAP_GITHUB_TOKEN`.
