@@ -502,3 +502,51 @@ Setup (`lab-runs/r6/`):
 **What this suggests:**
 1. **README results.** Report expr as −9% over two replicates and Hugo as −22% over one replicate, and say plainly that the tasks are of one kind. A second Hugo replicate, or a task mix, should come before launch.
 2. **Moved symbols.** The hidden gotcha from the trap is still true; only its file moved. A `symbol:` anchor whose declaration moved unchanged to another file could be shown as `[moved]` instead of hidden. Design under discussion: a sealed fingerprint of the declaration, compared on move, and hidden whenever it is ambiguous.
+
+## 12. R7: Hugo again, with a mix of task kinds, 14 sessions
+Setup (`lab-runs/r7/`):
+- **Binary:** `0.1.0-beta.5` (main at 892e1c8). Since R6 it gained `[moved]` for sealed `symbol:` anchors and B15: a `contains:` match inside one Go declaration gets a sealed `symbol:` anchor too.
+- **Design:** the same paired design and Hugo commit (@ed22b85) as R6, one replicate, Opus 5.5. The control copy keeps Hugo's own AGENTS.md.
+- **Tasks:** R6's tasks were all of one kind, so R7 mixes four kinds:
+  - **New template functions:** T1 `math.Hypot`, T4 `collections.Flatten` (deep), T7 `strings.Center`.
+  - **Helpers in `common/`:** T2 `hstrings.ToKebab`, T6 `paths.CommonPrefix` (by path segment).
+  - **Changes to existing behaviour:** T3 `strings.Repeat` errors when the result would pass 1 MiB; T5 `math.Sqrt` and `math.Log` error on negative input (and on zero for Log) instead of returning NaN or -Inf.
+- **Trap:** as in R6, `tpl/math/math.go` is renamed to `arith.go` before T5. T5 now edits the moved functions themselves.
+- **Acceptance tests:** validated against reference implementations of all seven, which also pass `go test ./tpl/... ./common/...`.
+- **Result:**
+  - **Acceptance tests:** 14/14 sessions passed.
+  - **Full suite:** 13/14 passed on the first run. The control's T4 hit `TestUnmarshalRefRemote` in `tpl/openapi/openapi3`, a test against a local `httptest` server that passed when rerun alone. It is a flake, not a regression.
+
+| Hugo (R7) | Mem | Ctrl | Turns mem/ctrl | Input tokens mem/ctrl |
+|---|---|---|---|---|
+| T1 math.Hypot | $0.31 | $0.37 | 11/11 | 248k/226k |
+| T2 hstrings.ToKebab | $0.27 | $0.25 | 9/10 | 204k/157k |
+| T3 strings.Repeat limit | $0.28 | $0.38 | 13/20 | 290k/558k |
+| T4 collections.Flatten | $0.38 | $0.46 | 16/20 | 383k/527k |
+| T5 Sqrt/Log errors (after the rename) | $0.33 | $0.29 | 13/11 | 286k/259k |
+| T6 paths.CommonPrefix | $0.30 | $0.29 | 12/11 | 295k/292k |
+| T7 strings.Center | $0.44 | $0.43 | 16/18 | 447k/481k |
+| **Total** | **$2.30** | **$2.47** | 90/101 | 2.15M/2.50M |
+
+**Verdict:**
+- **7% cheaper**, with 14% fewer input tokens and 11% fewer turns.
+- **The saving was much smaller than R6's 22%,** as the R6 caveat predicted. Three tasks were clearly cheaper (T1, T3, T4). T5 cost 14% more. The other three were within 8% either way, which is noise.
+- **Hugo over R6 and R7 combined:** $4.31 against $5.05, −15% over 14 tasks of five kinds.
+
+**Where the saving came from:**
+- **Template functions,** where the code map and the captured maps point to the namespace, the registration in `init.go` and the doc page: T1 −16%, T4 −17%. T7 broke even; both arms spent turns on the examples test there. The memory arm found the cause, a Hugo detail: the examples test trims whitespace, so an example output with surrounding spaces is not really checked. It saved this as a gotcha, anchored with B15's sealed symbol.
+- **T3, a change inside one function: −26%.** Both arms found `Repeat` with their first grep. The control then took 7 more turns, rerunning and filtering the `./tpl/...` suite several times. That is more likely task variance than memory.
+- **Helpers in `common/` broke even.** Nothing in memory pointed there before T2 and T6, and the packages are small enough to find with one grep.
+
+**The trap:**
+- **Both arms found the moved code at once.** The memory arm's first call in T5 was `Read tpl/math/arith.go`, where the code map pointed. The control's first grep for `func (ns *Namespace) (Sqrt|Log)` found it as well, so the trap cost the control nothing here.
+- **The rename made one memory stale, and it was hidden.** That memory came from T1 (its id is `5880fb`): "implement a new math function in `tpl/math/math.go`, register it in `init.go`…". Its `symbol:` anchor on `Namespace.Hypot` was sealed, and the declaration moved unchanged. Even so, it stayed stale rather than `[moved]`, because its claim names the old file. That is the rule from the `[moved]` design, and here it was right: the claim's instruction was no longer true. The T1 map memory went stale too, and the next map capture replaced it.
+- **The agent recorded the new fact:** that the math functions live in `arith.go`, renamed from `math.go`, and that Log and Sqrt now reject bad input. It anchored the fact with sealed symbols on the new file.
+
+**Caveats:**
+- **One replicate.** The run-to-run spread seen on chi was about 6%, so −7% is a small but likely real saving, not a measured one.
+- **The control learned the codebase too.** Each control session starts from the memory arm's code, so it inherits the code changes but no memories.
+
+**What this suggests:**
+1. **README results:** report Hugo as −22% for repeated same-kind tasks (R6) and −7% for a mix (R7), −15% over both. Put the mix figure first: it is the honest one for everyday work.
+2. **Claims that name a file stop `[moved]` from helping.** Agents tend to write the file path into the claim as well as into the anchor. One option is a hint in the agent guide: keep the path in the anchor and describe the role in the claim. Another is a `remember` note when the claim repeats a symbol anchor's path. Discuss before changing anything.
