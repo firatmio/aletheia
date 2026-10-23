@@ -11,6 +11,18 @@ export const site = {
   repo: "https://github.com/firatmio/aletheia",
   method: "https://github.com/firatmio/aletheia/blob/main/docs/dogfood-4.2.md",
   install: "go install github.com/firatmio/aletheia/cmd/aletheia@latest",
+  // The hero's install picker: every way to get the same binary.
+  installs: [
+    { id: "go", label: "Go", note: "Go 1.24+", cmd: "go install github.com/firatmio/aletheia/cmd/aletheia@latest" },
+    { id: "npm", label: "npm", note: "Node 18+, any OS", cmd: "npm install -g @firatmio/aletheia" },
+    {
+      id: "scoop",
+      label: "Scoop",
+      note: "Windows",
+      cmd: "scoop bucket add firatmio https://github.com/firatmio/scoop-bucket; scoop install aletheia",
+    },
+    { id: "brew", label: "Homebrew", note: "macOS, Linux", cmd: "brew install --cask firatmio/tap/aletheia" },
+  ],
 };
 
 export const hero = {
