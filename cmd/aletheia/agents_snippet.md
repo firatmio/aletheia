@@ -7,6 +7,7 @@
   - One fact per memory; split "X and Y" into two.
   - Several facts: save them in one call, `aletheia remember -` with one JSON object per line on stdin (`{"claim":"…","anchors":["symbol:…"]}`), or `memories` in the MCP tool.
   - Use `symbol:` (function, `Type.Method`, type, var, const) when the claim is about one declaration; otherwise anchor the line that proves the claim with `contains:`, not a comment, a name or a nearby line.
+  - Leave paths to the anchors: write what the code does ("Specs are measured by Parse"), not where it is. A claim that names the file goes stale instead of `[moved]` when the code moves.
   - Avoid `file:` anchors on files that change often; any edit stales them.
   - A claim that something is absent ("no auth", "no lock") cannot be proven: save it without anchors and with `--ttl 30d`.
 - Which files each task changed is recorded automatically when Aletheia's Claude Code Stop hook is set up; then save only non-obvious facts (gotchas, decisions). Without that hook, also save one map memory when you finish a task: where this kind of change is made and in which steps (e.g. "New builtin: register in builtin/registry.go, validate in builtin/validation.go, test in builtin/builtin_test.go"), anchored with `symbol:` on the key declarations.
