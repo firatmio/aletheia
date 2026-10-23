@@ -45,7 +45,7 @@
   <ul>
     <li>Memories are Markdown files in your project's <code>.aletheia/</code> folder. You decide whether to commit and share them.</li>
     <li>To check memories against the code, Aletheia reads your project's files. It never reads outside the project root, and anchors never execute anything.</li>
-    <li>With the Claude Code hooks, it reads the prompt you send and, when a task ends, the session transcript file that Claude Code names, to record which files the task changed. Both stay on your machine.</li>
+    <li>With the Claude Code hooks, it reads the prompt you send and, when a task ends, the session transcript file that Claude Code names, to record which files the task changed. That record is a memory in <code>.aletheia/</code>, labelled with the task's prompt shortened to 140 characters, so avoid putting anything private in prompts you don't want kept in the project. All of it stays on your machine.</li>
     <li>The one program it starts is <code>git check-ignore</code>, during <code>aletheia init</code>.</li>
     <li>Downloading it through npm, GitHub, Scoop or Homebrew is covered by those services' own policies.</li>
   </ul>
