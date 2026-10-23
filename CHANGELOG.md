@@ -2,7 +2,7 @@
 
 The notes for each release are in [docs/releases](docs/releases).
 
-## 0.1.1
+## 0.1.1 (2026-10-24)
 
 Packaging only; the binary behaves exactly as in 0.1.0.
 

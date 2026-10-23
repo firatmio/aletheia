@@ -211,6 +211,23 @@ Status 2026-10-22: the snapshot works (goreleaser v2.10.2 in Docker).
 6. **Verify each channel:** `npx -y @firatmio/aletheia@0.1.1 version`, `go install …@latest`, the Scoop manifest, and the cask on Linux.
 7. Put the date on the 0.1.1 heading in `CHANGELOG.md`.
 
+**v0.1.1 released (2026-10-24):**
+- **GitHub:** the release is out with `docs/releases/v0.1.1.md` as its notes.
+- **npm:** all seven packages are at 0.1.1, with `mcpName` set.
+- **Scoop, Homebrew:** both at 0.1.1.
+- **MCP Registry:** `io.github.firatmio/aletheia` 0.1.1 is active.
+- **Verified:**
+  - `npx` on Linux and Windows.
+  - `go install …@v0.1.1`.
+  - The Scoop hashes.
+  - The cask on Linux.
+  - The registry entry: npm, stdio, `serve`.
+- **Still open:**
+  - **Tap token:** goreleaser got a 403 on the tap and bucket again, so both files were pushed with `gh api` after their hashes were checked. The fine-grained token still lacks Contents read and write on `scoop-bucket` and `homebrew-tap`; Fırat fixes that.
+  - **Go proxy:** right after the tag, `go install …@latest` still resolved v0.1.0. The proxy caches its version list for a while; `@v0.1.1` worked at once.
+  - **npm:** the first publish attempt failed with E404 on PUT, which means a token or permission problem. A retry worked after Fırat sorted out the token.
+  - **Plugin directory:** the portal picks up plugin 0.1.1 with "Check for new commits".
+
 ### 4.4 Brand, README and landing page (decided with Fırat, 2026-10-21)
 - **No mascot.** The owl was dropped, and an anchor character was tried and dropped. Generated or stock imagery did not match.
 - **Mark: ἀ**, the alpha of ἀλήθεια, with the breathing mark in "verified" green.
