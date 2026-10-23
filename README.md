@@ -66,7 +66,15 @@ cd your-project
 aletheia init --agents     # creates .aletheia/ and adds usage notes to CLAUDE.md and AGENTS.md
 ```
 
-For Claude Code, add the two hooks. Recall then happens on every prompt and costs the agent nothing:
+**Claude Code plugin.** The plugin brings the MCP server and both hooks. `/aletheia:setup` then initializes the project:
+
+```text
+/plugin marketplace add firatmio/aletheia
+/plugin install aletheia@aletheia
+/aletheia:setup
+```
+
+Without the plugin, add the two hooks yourself. Recall then happens on every prompt and costs the agent nothing:
 
 ```bash
 aletheia init --claude-hooks   # merges them into .claude/settings.json, keeps your other settings

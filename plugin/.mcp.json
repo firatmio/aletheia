@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "aletheia": {
+      "command": "aletheia",
+      "args": ["serve"]
+    }
+  }
+}

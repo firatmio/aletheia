@@ -1,0 +1,12 @@
+{
+  "name": "aletheia",
+  "description": "Aletheia: memory for coding agents that checks itself against your code.",
+  "owner": { "name": "Fırat Tuna Arslan", "url": "https://github.com/firatmio" },
+  "plugins": [
+    {
+      "name": "aletheia",
+      "source": "./plugin",
+      "description": "Verified project memory: recall on every prompt, maps captured when a task ends, stale facts kept out of context."
+    }
+  ]
+}
