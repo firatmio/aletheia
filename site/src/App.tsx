@@ -260,7 +260,9 @@ export default function App() {
 
       <footer>
         <div class="wrap foot">
-          <span>{footer.left}</span>
+          <span>
+            {footer.left} · <a href="/privacy">{footer.privacy}</a>
+          </span>
           <span>
             {footer.agents} <a href="/agents.md">/agents.md</a> · <a href="/llms.txt">/llms.txt</a>
           </span>
