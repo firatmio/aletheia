@@ -284,7 +284,7 @@ What changed in each release is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md). If Aletheia misled your agent, the "An agent was misled" issue form is the most useful report you can send. Report security problems privately, as [SECURITY.md](SECURITY.md) describes.
 
 ## License
 
