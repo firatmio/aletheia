@@ -261,6 +261,7 @@ aletheia verify            # exits 1 if anything is stale`,
 
 export const footer = {
   left: "Apache-2.0 · written in Go, zero dependencies",
+  privacy: "Privacy",
   agents: "For agents:",
   right: "Fırat Tuna Arslan",
   credit: {

@@ -7,5 +7,9 @@
   "homepage": "https://aletheia.firattunaarslan.me",
   "repository": "https://github.com/firatmio/aletheia",
   "license": "Apache-2.0",
+  "documentationUrl": "https://github.com/firatmio/aletheia#readme",
+  "supportUrl": "https://github.com/firatmio/aletheia/issues",
+  "privacyPolicyUrl": "https://aletheia.firattunaarslan.me/privacy",
+  "termsOfServiceUrl": "https://github.com/firatmio/aletheia/blob/main/LICENSE",
   "keywords": ["memory", "mcp", "context", "agents"]
 }

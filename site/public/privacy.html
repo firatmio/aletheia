@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Privacy · Aletheia</title>
+<meta name="description" content="Aletheia collects nothing: no telemetry, no network requests. What the software and this website do with data." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<script>
+  try {
+    var t = localStorage.getItem("theme");
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
+<style>
+  :root { --ground: #0a0a0a; --line: #2a2a2a; --dim: #8a8a8a; --soft: #a3a3a3; --text: #f5f5f5; --ok: #3fc69a; color-scheme: dark; }
+  :root[data-theme="light"] { --ground: #fafafa; --line: #e5e5e5; --dim: #6b6b6b; --soft: #525252; --text: #0a0a0a; --ok: #0f7a5a; color-scheme: light; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --ground: #fafafa; --line: #e5e5e5; --dim: #6b6b6b; --soft: #525252; --text: #0a0a0a; --ok: #0f7a5a; color-scheme: light; } }
+  body { margin: 0; background: var(--ground); color: var(--soft); font: 400 16px/1.65 "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 56px 16px 72px; }
+  a { color: var(--text); }
+  .back { font: 400 13px/1 "IBM Plex Mono", ui-monospace, Consolas, monospace; color: var(--dim); text-decoration: none; }
+  .back:hover { color: var(--text); }
+  h1 { margin: 28px 0 4px; font: 400 44px/1.1 "Newsreader", "Iowan Old Style", Georgia, serif; color: var(--text); letter-spacing: -0.01em; }
+  .updated { margin: 0 0 32px; font: 400 13px/1 "IBM Plex Mono", ui-monospace, Consolas, monospace; color: var(--dim); }
+  h2 { margin: 36px 0 8px; font: 400 24px/1.2 "Newsreader", "Iowan Old Style", Georgia, serif; color: var(--text); }
+  p, li { margin: 0 0 12px; }
+  ul { padding-left: 20px; }
+  code { font: 400 14px/1 "IBM Plex Mono", ui-monospace, Consolas, monospace; color: var(--text); }
+  .lead { color: var(--text); }
+  .lead strong { color: var(--ok); font-weight: 500; }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13px; color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="/">← aletheia</a>
+  <h1>Privacy</h1>
+  <p class="updated">Updated 24 October 2026</p>
+
+  <p class="lead"><strong>Aletheia collects nothing.</strong> It has no telemetry and makes no network requests. Your memories stay in your project, on your machine.</p>
+
+  <h2>The software</h2>
+  <p>This covers the <code>aletheia</code> binary, its MCP server, the Claude Code plugin, and the npm, Scoop and Homebrew packages that install it.</p>
+  <ul>
+    <li>Memories are Markdown files in your project's <code>.aletheia/</code> folder. You decide whether to commit and share them.</li>
+    <li>To check memories against the code, Aletheia reads your project's files. It never reads outside the project root, and anchors never execute anything.</li>
+    <li>With the Claude Code hooks, it reads the prompt you send and, when a task ends, the session transcript file that Claude Code names, to record which files the task changed. Both stay on your machine.</li>
+    <li>The one program it starts is <code>git check-ignore</code>, during <code>aletheia init</code>.</li>
+    <li>Downloading it through npm, GitHub, Scoop or Homebrew is covered by those services' own policies.</li>
+  </ul>
+
+  <h2>This website</h2>
+  <ul>
+    <li>The site is a set of static pages with no analytics, no cookies and no tracking. Its fonts and images are served from this site, so your browser makes no requests to third parties.</li>
+    <li>It is hosted by Vercel, which processes standard request data such as IP address and user agent to serve and protect the site, under <a href="https://vercel.com/legal/privacy-policy">Vercel's privacy policy</a>.</li>
+    <li>The site keeps two preferences in your browser's local storage: the colour theme and the install tab you picked. They never leave your browser.</li>
+  </ul>
+
+  <h2>Contact</h2>
+  <p>Questions or concerns: open an issue at <a href="https://github.com/firatmio/aletheia/issues">github.com/firatmio/aletheia/issues</a>.</p>
+
+  <footer>Aletheia is open source under the <a href="https://github.com/firatmio/aletheia/blob/main/LICENSE">Apache License 2.0</a>.</footer>
+</main>
+</body>
+</html>
