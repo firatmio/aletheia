@@ -10,6 +10,19 @@ import (
 	"testing"
 )
 
+// TestMain keeps the tests away from the developer's own Claude Code
+// settings: init reads enabledPlugins from the user's config directory.
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "aletheia-claude-config")
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("CLAUDE_CONFIG_DIR", dir)
+	code := m.Run()
+	os.RemoveAll(dir)
+	os.Exit(code)
+}
+
 func runCLI(t *testing.T, dir, stdin string, args ...string) (int, string, string) {
 	t.Helper()
 	var out, errb bytes.Buffer
@@ -298,6 +311,42 @@ func TestInitPrintsNextSteps(t *testing.T) {
 	_, out, _ = runCLI(t, dir, "", "init", "--agents", "--claude-hooks")
 	if strings.Contains(out, "init --claude-hooks ") || strings.Contains(out, "init --agents ") {
 		t.Fatalf("steps already done should not be suggested: %q", out)
+	}
+}
+
+func TestInitKnowsAboutThePluginAndSmallProjects(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", config)
+	writeFile(t, config, "settings.json", `{"enabledPlugins": {"aletheia@aletheia": true}}`)
+	dir := t.TempDir()
+	writeFile(t, dir, "main.go", "package main\n\nfunc main() {}\n")
+
+	_, out, _ := runCLI(t, dir, "", "init")
+	if strings.Contains(out, "init --claude-hooks") || !strings.Contains(out, "plugin is enabled and brings both hooks") {
+		t.Fatalf("with the plugin enabled, init must not suggest the hooks again: %q", out)
+	}
+	if !strings.Contains(out, "no code map") {
+		t.Fatalf("a one-file project gets no code map, and init should say so: %q", out)
+	}
+	_, out, _ = runCLI(t, dir, "", "init", "--claude-hooks")
+	if !strings.Contains(out, "would run twice") {
+		t.Fatalf("adding the hooks next to the plugin should warn: %q", out)
+	}
+
+	// A project setting that turns the plugin off wins over the user's.
+	writeFile(t, dir, ".claude/settings.local.json", `{"enabledPlugins": {"aletheia@aletheia": false}}`)
+	if pluginEnabled(dir) {
+		t.Fatal("settings.local.json disables the plugin for this project")
+	}
+}
+
+func TestDryRunSaysWhyItIsEmpty(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "main.go", "package main\n\nfunc main() {}\n")
+	runCLI(t, dir, "", "init")
+	_, out, _ := runCLI(t, dir, "", "hook", "--dry-run", "how are routes structured")
+	if !strings.Contains(out, "memories: none yet") || !strings.Contains(out, "code map: none for 1 source files") {
+		t.Fatalf("an empty dry run should explain itself: %q", out)
 	}
 }
 

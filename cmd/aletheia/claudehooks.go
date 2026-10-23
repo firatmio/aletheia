@@ -157,3 +157,48 @@ func writeObject(keys []string, vals map[string]json.RawMessage) []byte {
 	b.WriteString("}")
 	return b.Bytes()
 }
+
+// pluginEnabled reports whether Aletheia's Claude Code plugin is enabled for
+// the project: an "aletheia@<marketplace>" entry set to true in the
+// enabledPlugins of the user's or the project's Claude Code settings. The
+// first file that mentions it decides, in Claude Code's precedence: local,
+// project, user. The plugin brings the hooks, so init must not suggest
+// adding them again.
+func pluginEnabled(root string) bool {
+	config := os.Getenv("CLAUDE_CONFIG_DIR")
+	if config == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			config = filepath.Join(home, ".claude")
+		}
+	}
+	files := []string{
+		filepath.Join(root, ".claude", "settings.local.json"),
+		filepath.Join(root, ".claude", "settings.json"),
+	}
+	if config != "" {
+		files = append(files, filepath.Join(config, "settings.json"))
+	}
+	for _, p := range files {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		var s struct {
+			EnabledPlugins map[string]any `json:"enabledPlugins"`
+		}
+		if json.Unmarshal(data, &s) != nil {
+			continue
+		}
+		found, on := false, false
+		for k, v := range s.EnabledPlugins {
+			if strings.HasPrefix(k, "aletheia@") {
+				b, _ := v.(bool)
+				found, on = true, on || b
+			}
+		}
+		if found {
+			return on
+		}
+	}
+	return false
+}

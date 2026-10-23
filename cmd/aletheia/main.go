@@ -338,32 +338,51 @@ func (c *cli) init(args []string) int {
 		}
 		fmt.Fprintln(c.out, msg)
 	}
+	plugin := pluginEnabled(st.Root)
 	if f.bools["claude-hooks"] {
 		msg, err := installClaudeHooks(st.Root)
 		if err != nil {
 			return c.fail(err)
 		}
 		fmt.Fprintln(c.out, msg)
+		if plugin {
+			fmt.Fprintln(c.out, "warning: the aletheia Claude Code plugin is enabled and brings the same hooks, so they would run twice; "+
+				"remove them from .claude/settings.json or disable the plugin")
+		}
 	}
-	fmt.Fprint(c.out, nextSteps(f.bools["agents"], f.bools["claude-hooks"]))
+	mapped := true
+	if m, err := codemap.Build(st.Root); err == nil && m.SuggestedBudget() == 0 {
+		mapped = false
+	}
+	fmt.Fprint(c.out, nextSteps(f.bools["agents"], f.bools["claude-hooks"], plugin, mapped))
 	return exitOK
 }
 
 // nextSteps tells the user what is left after init. Connecting an agent
-// changes that agent's configuration, so it is printed, not done.
-func nextSteps(agents, hooks bool) string {
+// changes that agent's configuration, so it is printed, not done. With the
+// Claude Code plugin enabled the hooks are already there; in a project too
+// small for a code map, recall starts with the first memory.
+func nextSteps(agents, hooks, plugin, mapped bool) string {
 	var b strings.Builder
 	b.WriteString("\nnext steps:\n")
 	if !agents {
 		b.WriteString("  aletheia init --agents          usage notes for agents in CLAUDE.md and AGENTS.md\n")
 	}
-	if !hooks {
+	switch {
+	case plugin && !hooks:
+		b.WriteString("  Claude Code: the aletheia plugin is enabled and brings both hooks; nothing to add\n")
+	case !hooks:
 		b.WriteString("  aletheia init --claude-hooks    Claude Code: recall on every prompt, maps at the end of a task\n" +
 			"                                  (run it yourself; agents usually may not change their own hooks)\n")
 	}
 	b.WriteString(`  other MCP clients: {"mcpServers": {"aletheia": {"command": "aletheia", "args": ["serve"]}}}` + "\n" +
-		`  aletheia hook --dry-run [prompt]   see what an agent would get; changes nothing` + "\n" +
-		"memories start empty; the code map works from the first prompt (aletheia map \"<topic>\")\n")
+		`  aletheia hook --dry-run [prompt]   see what an agent would get; changes nothing` + "\n")
+	if mapped {
+		b.WriteString("memories start empty; the code map works from the first prompt (aletheia map \"<topic>\")\n")
+	} else {
+		b.WriteString("memories start empty; the project is small enough for an agent to read, so there is no code map: " +
+			"recall starts with the first memory\n")
+	}
 	return b.String()
 }
 
@@ -584,7 +603,7 @@ func (c *cli) hook(args []string) int {
 		}
 		parts := hookContext(e, strings.Join(f.pos, " "), "", budget, limit, mapBudget)
 		if len(parts) == 0 {
-			fmt.Fprintln(c.out, "nothing would be added for this prompt")
+			fmt.Fprintln(c.out, "nothing would be added for this prompt:\n"+emptyReasons(e, mapBudget))
 			return exitOK
 		}
 		fmt.Fprintln(c.out, strings.Join(parts, "\n\n"))
@@ -649,6 +668,28 @@ func hookContext(e *engine.Engine, prompt, session string, budget, limit, mapBud
 		}
 	}
 	return parts
+}
+
+// emptyReasons says why a dry run adds nothing, so an empty result reads as
+// expected rather than broken.
+func emptyReasons(e *engine.Engine, mapBudget int) string {
+	var b strings.Builder
+	if st := e.Stats(); st.Active == 0 {
+		b.WriteString("  memories: none yet; they appear as agents save them (or: aletheia remember)\n")
+	} else {
+		fmt.Fprintf(&b, "  memories: %d active, none relevant to this prompt\n", st.Active)
+	}
+	switch m, err := codemap.Build(e.Store.Root); {
+	case mapBudget == 0:
+		b.WriteString("  code map: off (--map-budget 0)\n")
+	case err != nil:
+		fmt.Fprintf(&b, "  code map: %v\n", err)
+	case mapBudget < 0 && m.SuggestedBudget() == 0:
+		fmt.Fprintf(&b, "  code map: none for %d source files; an agent reads a project this small directly\n", m.Files)
+	default:
+		b.WriteString("  code map: nothing in it matches this prompt\n")
+	}
+	return strings.TrimRight(b.String(), "\n")
 }
 
 // mapPreamble introduces the code map in the agent's context.
