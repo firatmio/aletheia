@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/firatmio/aletheia/security/advisories/new
+    about: Privately, please. See SECURITY.md.
+  - name: Agent setup guide
+    url: https://aletheia.firattunaarslan.me/agents.md
+    about: Setup steps for agents and people, before opening a setup question.

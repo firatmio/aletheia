@@ -51,33 +51,27 @@ Coding agents forget everything between sessions, so they re-read the same files
 
 - **Memories carry evidence.** Each memory is a claim plus anchors: a function that must still exist, a line that must still match, a file that must still be there.
 - **Evidence is checked on every recall.** The checks are mechanical: no model calls, no embeddings, no network. A memory whose evidence broke is hidden from the agent, and a one-line note says so.
+- **Moved code is followed.** When a Go declaration moves unchanged to another file, its memory comes back as `[moved]` with the new place instead of going stale.
 - **Recall points at lines.** A pointer such as `builtin_test.go:263` is computed from the files right now, so the agent opens the right lines instead of searching for them.
 - **Maps write themselves.** When the agent stops, Aletheia reads the session transcript and records which files the task changed. The next task of the same kind starts there, and the agent spends no turns writing it down.
 - **Nothing is deleted.** Replaced memories are superseded and long-stale ones archived by `aletheia lethe` (Lethe, the river of forgetting).
 
 ## Quick start
 
-Install it in whichever way suits you. Every option gives you the same single binary:
+**1. Install** it in whichever way suits you. Every option gives you the same single binary:
 
 ```bash
+npm install -g @firatmio/aletheia                             # Node 18+, any OS
 go install github.com/firatmio/aletheia/cmd/aletheia@latest   # Go 1.24+
 scoop bucket add firatmio https://github.com/firatmio/scoop-bucket; scoop install aletheia   # Windows
 brew install --cask firatmio/tap/aletheia                     # macOS, Linux
-npm install -g @firatmio/aletheia                             # Node 18+, any of the three
 ```
-
-MCP clients configured with `npx` need no install: `{"command": "npx", "args": ["-y", "@firatmio/aletheia", "serve"]}`.
 
 Prebuilt archives for Linux, macOS and Windows are on the [releases page](https://github.com/firatmio/aletheia/releases).
 
-Then set it up in your project:
+**2. Connect your agent.**
 
-```bash
-cd your-project
-aletheia init --agents     # creates .aletheia/ and adds usage notes to CLAUDE.md and AGENTS.md
-```
-
-**Claude Code plugin.** The plugin brings the MCP server and both hooks. `/aletheia:setup` then initializes the project:
+*Claude Code, with the plugin (recommended).* It brings the MCP server and both hooks. `/aletheia:setup` then initializes the project:
 
 ```text
 /plugin marketplace add firatmio/aletheia
@@ -85,14 +79,15 @@ aletheia init --agents     # creates .aletheia/ and adds usage notes to CLAUDE.m
 /aletheia:setup
 ```
 
-Without the plugin, add the two hooks yourself. Recall then happens on every prompt and costs the agent nothing:
+*Claude Code, without the plugin.* Set up the project and add the two hooks yourself. Recall then happens on every prompt and costs the agent nothing:
 
 ```bash
-aletheia init --claude-hooks   # merges them into .claude/settings.json, keeps your other settings
-aletheia hook --dry-run        # what an agent would get (add a prompt to try one); changes nothing
+cd your-project
+aletheia init --agents --claude-hooks   # .aletheia/, usage notes in CLAUDE.md and AGENTS.md, hooks in .claude/settings.json
+aletheia hook --dry-run                 # what an agent would get (add a prompt to try one); changes nothing
 ```
 
-Run `init --claude-hooks` yourself. Agents are usually not allowed to change their own hooks, and that is by design. To edit the file by hand instead, use this:
+Run `--claude-hooks` yourself. Agents are usually not allowed to change their own hooks, and that is by design. Don't add these hooks if the plugin is installed: it brings the same two. `init` notices the plugin and says so. To edit the file by hand instead, use this:
 
 ```json
 {
@@ -103,15 +98,17 @@ Run `init --claude-hooks` yourself. Agents are usually not allowed to change the
 }
 ```
 
-An agent can also do the rest of the setup from the [agent guide](https://aletheia.firattunaarslan.me/agents.md). It hands the hook step to you as that single command.
+*Any other agent.* Cursor, VS Code, Claude Desktop and Codex connect over MCP; agents without MCP use the CLI. See [Other agents](#reference) below. An MCP client configured with `npx` needs no install at all: `{"command": "npx", "args": ["-y", "@firatmio/aletheia", "serve"]}`.
+
+An agent can also do the setup itself from the [agent guide](https://aletheia.firattunaarslan.me/agents.md). It hands the hook step to you as that single command.
 
 Memories live in `.aletheia/memories/*.md` as plain Markdown. Commit them and your team, and every agent, shares one memory that verifies itself on each machine.
 
-**Upgrading:** `scoop update aletheia`, `brew upgrade --cask aletheia` or `npm update -g @firatmio/aletheia`. With Go, run the same `go install` again.
-- **On Windows,** a running agent keeps `aletheia.exe` open through the MCP server, so the install fails with "file in use". Quit the agent first, or move the old binary aside and install. Windows allows renaming a running exe.
+**Upgrading:** `npm update -g @firatmio/aletheia`, `scoop update aletheia` or `brew upgrade --cask aletheia`. With Go, run the same `go install` again. Update the plugin with `claude plugin update aletheia@aletheia`.
 - **Which version runs:** the hooks use the new binary right away. The MCP server keeps the old one until the agent restarts.
+- **With `go install` on Windows,** a running agent keeps `aletheia.exe` open through the MCP server, so the install fails with "file in use". Quit the agent first, or move the old binary aside, which Windows allows for a running exe.
 
-The Windows command works on every upgrade. It removes old copies that are no longer in use, and the random name never collides with one that is still running:
+This works on every upgrade. It removes old copies that are no longer in use, and the random name never collides with one that is still running:
 
 ```powershell
 $bin = "$(go env GOPATH)\bin"
@@ -145,7 +142,7 @@ Aletheia pays off where finding the right place is expensive, in mid-size and la
 | `file:PATH` | the file's content is unchanged (hash sealed when saved) | `file:go.mod` |
 
 - Use `symbol` for claims about one declaration and `contains` for one thing in a file. Use `file` only when any change should trigger a re-check.
-- Recall shows where `symbol` and `contains` evidence is right now, e.g. `(store.go:15-21)`. Go declarations get their full range from `go/parser`; other languages get the declaring line.
+- Recall shows where `symbol` and `contains` evidence is right now, e.g. `(store.go:15-21)`. Go declarations get their full range from `go/parser`. In other languages a `symbol` anchor finds the declaring line by its keyword (`function`, `class`, `def`, `fn` and the like); it is not sealed, so it cannot follow a move.
 - **Moved code.** A Go `symbol` anchor is sealed with a fingerprint of the declaration (`symbol:store.go::Store.Get@3f9a…`). The fingerprint ignores comments and layout.
   - **Edits in place:** they never stale the anchor. If the declaration is still in its file, the fingerprint is not even consulted.
   - **A moved declaration:** if the declaration leaves its file, Aletheia searches the project for it. When exactly one declaration with that name has the same fingerprint, the memory comes back as `[moved: old.go → new.go]` with the new lines, and `verify <id> --reseal` records the new path.
@@ -153,6 +150,7 @@ Aletheia pays off where finding the right place is expensive, in mid-size and la
   - **`contains` anchors in Go code:** when one matches inside a single declaration, `remember` adds a sealed `symbol` anchor for that declaration. The `contains` anchor then moves with it, but only if its pattern still matches inside that declaration at the new place.
 - In a `contains` pattern, a run of spaces matches any run of spaces or tabs, so reformatting does not stale it.
 - Files named in a claim get an `exists:` anchor automatically.
+- Leave paths to the anchors: say what the code does ("Tokens are issued by IssueToken"), not where it is. A claim that names its symbol's file stays stale when the code moves, and `remember` says so when you save one.
 - `remember` warns when a `contains` anchor only matches comments, since a comment can stay while the code changes.
 - A memory without anchors comes back as `[?]`, ranked below verified facts, and expires after 90 days unless re-confirmed.
 
@@ -192,9 +190,11 @@ Aletheia speaks MCP over stdio with four tools (`recall`, `remember`, `get`, `ve
 }
 ```
 
+Without a global install, use `"command": "npx", "args": ["-y", "@firatmio/aletheia", "serve", "--dir", "…"]`. The server finds `.aletheia/` from `--dir`, or from the directory the client starts it in. In a project without one, the tools answer with how to set it up rather than failing, and start working as soon as `aletheia init` has run.
+
 - **VS Code** (`.vscode/mcp.json`): use `"servers"` instead of `"mcpServers"`, and `${workspaceFolder}` as the directory.
-- **Claude Code:** `claude mcp add aletheia -- aletheia serve`. The hooks above matter more, because Claude Code loads MCP tool descriptions on demand.
-- **Agents without MCP** (Codex, Aider, custom agents): `aletheia init --agents` writes a short block to `AGENTS.md` that teaches the agent to call the CLI. Add `--json` to any read command for machine-readable output.
+- **Claude Code:** use the plugin from the quick start. It adds the hooks too, and they matter more than the tools, because Claude Code loads MCP tool descriptions on demand.
+- **Agents without MCP** (Aider, custom agents): `aletheia init --agents` writes a short block to `AGENTS.md` that teaches the agent to call the CLI. Codex reads `AGENTS.md` too, so it gets the same notes alongside the MCP tools. Add `--json` to any read command for machine-readable output.
 </details>
 
 <details>
@@ -203,7 +203,7 @@ Aletheia speaks MCP over stdio with four tools (`recall`, `remember`, `get`, `ve
 ```markdown
 ---
 id: "3f9a1c"
-claim: "Auth tokens are issued in src/auth/jwt.go"
+claim: "Auth tokens are issued by IssueToken, HS256 with a 15 minute expiry"
 confidence: 0.8
 status: "active"
 source: "claude-code"
@@ -212,11 +212,13 @@ updated: "2026-10-21T09:12:44Z"
 tags:
   - "auth"
 anchors:
-  - "symbol:src/auth/jwt.go::IssueToken"
-  - "exists:src/auth/jwt.go"
+  - "symbol:src/auth/jwt.go::IssueToken@7370a7fe3669256c"
+  - "contains:src/auth/jwt.go::jwt\\.SigningMethodHS256"
 ---
-Tokens are HS256 with a 15 minute expiry. Refresh lives in refresh.go.
+Refresh tokens are handled separately, by RefreshToken.
 ```
+
+The `@7370a7fe3669256c` suffix is the sealed fingerprint that lets the memory follow `IssueToken` if it moves.
 
 Edit memories by hand, review them in pull requests, grep them. They are just files.
 </details>
@@ -234,10 +236,13 @@ aletheia get <id> [--json]
 aletheia verify [id] [--reseal] [--ttl 30d] [--json]   # exits 1 if anything is stale (CI-friendly)
 aletheia map [topic] [--budget 600]
 aletheia hook [--budget N] [--map-budget N] [--dry-run [prompt]]   # Claude Code hook; every command takes --help
-aletheia lethe [--days 30] [--apply]                     # archive superseded and long-stale memories
+aletheia lethe [--days 30] [--apply] [--json]            # archive superseded and long-stale memories
 aletheia stats [--json]
 aletheia serve [--dir DIR]                               # MCP server on stdio
+aletheia version
 ```
+
+Every command takes `--help`, and `--dir DIR` (or `ALETHEIA_DIR`) to point at a project from elsewhere.
 
 `remember` exits with code `3` when the claim duplicates or closely matches an existing memory, and names it so the agent can `--supersedes` it instead.
 
@@ -259,7 +264,8 @@ It prints one result per line, in order. It exits `0` when all are saved, `3` wh
 - **Never executes anything.** Anchors only read files; there is no "run this command to verify" anchor.
 - **Stays inside the project.** Anchor paths are relative and cannot escape the root, including through symlinks.
 - **Memories are data, not instructions.** The MCP server tells agents so, and the `CLAUDE.md` / `AGENTS.md` block repeats it.
-- **No network, no telemetry, no dependencies.** A single static binary using only the Go standard library.
+- **No network, no telemetry, no dependencies.** A single static binary using only the Go standard library. The one program it starts is `git check-ignore`, during `init`, to see whether CLAUDE.md is ignored.
+- **Privacy:** Aletheia collects nothing. The hooks read the prompt and the session transcript on your machine, and the map memories keep a shortened copy of the prompt in `.aletheia/`. See the [privacy policy](https://aletheia.firattunaarslan.me/privacy).
 </details>
 
 ## Roadmap
@@ -267,14 +273,18 @@ It prints one result per line, in order. It exits `0` when all are saved, `3` wh
 - [x] Evidence-anchored memories, checked on every recall
 - [x] Recall hook, live line pointers, code map, task maps from the Stop hook
 - [x] Benchmark harness with paired runs on real repositories
+- [x] Moved Go code followed by fingerprint (`[moved]`)
+- [x] Prebuilt binaries, npm, Homebrew and Scoop; a Claude Code plugin; listed in the MCP Registry
+- [ ] Sealed `symbol` anchors, and `[moved]`, beyond Go: TypeScript/JavaScript and Python first
+- [ ] `aletheia doctor`: find anchors that keep going stale and suggest sturdier ones
 - [ ] Longer benchmarks with more repositories and repeated kinds of change
-- [ ] Follow file renames with git and suggest re-anchoring
-- [ ] Prebuilt binaries, Homebrew, Scoop and an `npx` wrapper
 - [ ] Global, cross-project memory for personal preferences
+
+What changed in each release is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md). If Aletheia misled your agent, the "An agent was misled" issue form is the most useful report you can send. Report security problems privately, as [SECURITY.md](SECURITY.md) describes.
 
 ## License
 

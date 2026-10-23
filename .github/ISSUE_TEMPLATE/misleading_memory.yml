@@ -1,0 +1,41 @@
+name: An agent was misled
+description: A memory came back as [ok] or [moved] but wasn't true, or a true one was hidden as stale.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the feedback that improves Aletheia most. Thank you.
+  - type: textarea
+    id: memory
+    attributes:
+      label: The memory
+      description: The memory file from `.aletheia/memories/` (or the output of `aletheia get <id>`). Remove anything private.
+      render: markdown
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What went wrong
+      options:
+        - It was [ok] but the claim was false
+        - It was [moved] but the code had changed
+        - It was hidden as stale but still true
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: What changed in the code
+      description: The edit or move that should have staled it, or that wrongly did.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: aletheia version
+      placeholder: aletheia 0.1.1
+    validations:
+      required: true
