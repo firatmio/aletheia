@@ -302,10 +302,11 @@ export const footer = {
   author: {
     name: "Fırat Tuna Arslan",
     links: [
-      { label: "firattunaarslan.me", href: "https://firattunaarslan.me" },
-      { label: "GitHub", href: "https://github.com/firatmio" },
-      { label: "X", href: "https://x.com/firattunaarslan" },
-      { label: "LinkedIn", href: "https://www.linkedin.com/in/firattunaarslan" },
+      // `icon` names a solid-icons component in App.tsx; `label` is its accessible name.
+      { icon: "site", label: "firattunaarslan.me", href: "https://firattunaarslan.me" },
+      { icon: "github", label: "GitHub", href: "https://github.com/firatmio" },
+      { icon: "x", label: "X", href: "https://x.com/firattunaarslan" },
+      { icon: "linkedin", label: "LinkedIn", href: "https://www.linkedin.com/in/firattunaarslan" },
     ],
   },
   privacy: "Privacy",

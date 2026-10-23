@@ -1,4 +1,6 @@
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { Dynamic } from "solid-js/web";
+import { FaBrandsGithub, FaBrandsLinkedinIn, FaBrandsXTwitter, FaSolidGlobe } from "solid-icons/fa";
 import Board from "./components/Board";
 import Copy from "./components/Copy";
 import Mark from "./components/Mark";
@@ -107,6 +109,9 @@ function InstallPicker() {
     </div>
   );
 }
+
+// The author's links in the footer, by the `icon` names in content.ts.
+const socialIcons = { site: FaSolidGlobe, github: FaBrandsGithub, x: FaBrandsXTwitter, linkedin: FaBrandsLinkedinIn };
 
 // The GitHub mark (Octicons, MIT), in the text colour.
 function GitHubMark() {
@@ -284,7 +289,13 @@ export default function App() {
             © 2026 {footer.author.name} · <a href="/privacy">{footer.privacy}</a>
           </span>
           <span class="foot-social">
-            <For each={footer.author.links}>{(l) => <a href={l.href} rel="me">{l.label}</a>}</For>
+            <For each={footer.author.links}>
+              {(l) => (
+                <a href={l.href} rel="me" aria-label={l.label} title={l.label}>
+                  <Dynamic component={socialIcons[l.icon as keyof typeof socialIcons]} size={18} aria-hidden="true" />
+                </a>
+              )}
+            </For>
           </span>
         </div>
         <p class="wrap credit">
