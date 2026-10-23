@@ -187,6 +187,24 @@ func claimNames(claim, file string) bool {
 	return strings.Contains(claim, file) || strings.Contains(claim, path.Base(file))
 }
 
+// claimPathNotes warns when the claim names the file of a symbol anchor. Such
+// a memory goes stale instead of [moved] when the code moves (claimNames), so
+// agents should describe the code's role and leave the path to the anchor.
+func claimPathNotes(claim string, anchors []string) []string {
+	var notes []string
+	seen := map[string]bool{}
+	for _, raw := range anchors {
+		a, err := anchor.Parse(raw)
+		if err != nil || a.Kind != anchor.KindSymbol || seen[a.Path] || !claimNames(claim, a.Path) {
+			continue
+		}
+		seen[a.Path] = true
+		notes = append(notes, "the claim names "+a.Path+", so the memory goes stale rather than [moved] if "+a.Arg+
+			" moves; name the code's role, not its file, unless the file is the point")
+	}
+	return notes
+}
+
 func pointer(path string, start, end int) string {
 	if end > start {
 		return fmt.Sprintf("%s:%d-%d", path, start, end)
@@ -402,6 +420,7 @@ func (e *Engine) Remember(in RememberInput) (*store.Memory, Verdict, error) {
 		anchors = append(anchors, s...)
 		notes = append(notes, "added "+strings.Join(s, ", ")+": the memory follows that code if it moves")
 	}
+	notes = append(notes, claimPathNotes(claim, anchors)...)
 	added, missing := e.anchorNamedPaths(claim, covered)
 	if len(added) > 0 {
 		anchors = append(anchors, added...)

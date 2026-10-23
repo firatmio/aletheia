@@ -358,8 +358,9 @@ func TestFilesNamedInClaimAreAnchored(t *testing.T) {
 	if strings.Join(m.Anchors, " ") != strings.Join(want, " ") {
 		t.Fatalf("anchors = %q, want %q", m.Anchors, want)
 	}
-	if verdict.Freshness != Verified || len(verdict.Notes) != 2 || !strings.Contains(verdict.Notes[0], "files named in the claim") ||
-		verdict.Notes[1] != "the claim names files that do not exist: docs/missing.md" {
+	if verdict.Freshness != Verified || len(verdict.Notes) != 3 || !strings.Contains(verdict.Notes[0], "the claim names builtin/lib.go") ||
+		!strings.Contains(verdict.Notes[1], "files named in the claim") ||
+		verdict.Notes[2] != "the claim names files that do not exist: docs/missing.md" {
 		t.Fatalf("verdict = %+v", verdict)
 	}
 	if m.Expires != nil {
@@ -577,6 +578,22 @@ func TestMovedCodeDoesNotSaveAClaimAboutTheOldFile(t *testing.T) {
 	}
 	if _, err := v.e.Reseal(m.ID, 0); err == nil || !strings.Contains(err.Error(), "supersede") {
 		t.Fatalf("reseal must refuse and point to supersede: %v", err)
+	}
+}
+
+func TestRememberWarnsWhenTheClaimNamesASymbolsFile(t *testing.T) {
+	v := newEnv(t)
+	v.write(t, "parse.go", "package p\n\nfunc Parse(s string) int { return len(s) }\n")
+	_, verdict, err := v.e.Remember(RememberInput{Claim: "Parse lives in parse.go", Anchors: []string{"symbol:parse.go::Parse"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(verdict.Notes) != 1 || !strings.Contains(verdict.Notes[0], "goes stale rather than [moved] if Parse moves") {
+		t.Fatalf("want a note that the claim pins the file: %+v", verdict)
+	}
+	_, verdict, err = v.e.Remember(RememberInput{Claim: "Specs are measured by Parse", Anchors: []string{"symbol:parse.go::Parse"}})
+	if err != nil || len(verdict.Notes) != 0 {
+		t.Fatalf("a claim about the code's role needs no note: %v %+v", err, verdict)
 	}
 }
 
