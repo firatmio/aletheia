@@ -260,10 +260,55 @@ aletheia verify            # exits 1 if anything is stale`,
 };
 
 export const footer = {
-  left: "Apache-2.0 · written in Go, zero dependencies",
+  tagline: "Memory your coding agent can verify.",
+  meta: "Apache-2.0 · written in Go, zero dependencies",
+  columns: [
+    {
+      title: "Product",
+      links: [
+        { label: "How it works", href: "#board" },
+        { label: "Results", href: "#results" },
+        { label: "Quick start", href: "#start" },
+        { label: "Changelog", href: "https://github.com/firatmio/aletheia/blob/main/CHANGELOG.md" },
+        { label: "Method and numbers", href: "https://github.com/firatmio/aletheia/blob/main/docs/dogfood-4.2.md" },
+      ],
+    },
+    {
+      title: "Get it",
+      links: [
+        { label: "GitHub", href: "https://github.com/firatmio/aletheia" },
+        { label: "Releases", href: "https://github.com/firatmio/aletheia/releases" },
+        { label: "npm", href: "https://www.npmjs.com/package/@firatmio/aletheia" },
+        { label: "Homebrew tap", href: "https://github.com/firatmio/homebrew-tap" },
+        { label: "Scoop bucket", href: "https://github.com/firatmio/scoop-bucket" },
+      ],
+    },
+    {
+      title: "Listed on",
+      links: [
+        { label: "MCP Registry", href: "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.firatmio/aletheia" },
+        { label: "Glama", href: "https://glama.ai/mcp/servers/firatmio/aletheia" },
+        { label: "Claude Code plugin", href: "https://github.com/firatmio/aletheia#quick-start" },
+      ],
+    },
+    {
+      title: "For agents",
+      links: [
+        { label: "/agents.md", href: "/agents.md" },
+        { label: "/llms.txt", href: "/llms.txt" },
+      ],
+    },
+  ],
+  author: {
+    name: "Fırat Tuna Arslan",
+    links: [
+      { label: "firattunaarslan.me", href: "https://firattunaarslan.me" },
+      { label: "GitHub", href: "https://github.com/firatmio" },
+      { label: "X", href: "https://x.com/firattunaarslan" },
+      { label: "LinkedIn", href: "https://www.linkedin.com/in/firattunaarslan" },
+    ],
+  },
   privacy: "Privacy",
-  agents: "For agents:",
-  right: "Fırat Tuna Arslan",
   credit: {
     before: "Behind the title: Pierre Puvis de Chavannes, ",
     title: "The Sacred Grove, Beloved of the Arts and the Muses",

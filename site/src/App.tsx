@@ -260,13 +260,32 @@ export default function App() {
 
       <footer>
         <div class="wrap foot">
+          <div class="foot-brand">
+            <a class="brand" href="#top" aria-label="aletheia, back to top">
+              <Mark size={24} />
+              <span class="wordmark">aletheia</span>
+            </a>
+            <p>{footer.tagline}</p>
+            <p class="dim">{footer.meta}</p>
+          </div>
+          <For each={footer.columns}>
+            {(col) => (
+              <nav class="foot-col" aria-label={col.title}>
+                <h2>{col.title}</h2>
+                <ul>
+                  <For each={col.links}>{(l) => <li><a href={l.href}>{l.label}</a></li>}</For>
+                </ul>
+              </nav>
+            )}
+          </For>
+        </div>
+        <div class="wrap foot-bar">
           <span>
-            {footer.left} · <a href="/privacy">{footer.privacy}</a>
+            © 2026 {footer.author.name} · <a href="/privacy">{footer.privacy}</a>
           </span>
-          <span>
-            {footer.agents} <a href="/agents.md">/agents.md</a> · <a href="/llms.txt">/llms.txt</a>
+          <span class="foot-social">
+            <For each={footer.author.links}>{(l) => <a href={l.href} rel="me">{l.label}</a>}</For>
           </span>
-          <span>{footer.right}</span>
         </div>
         <p class="wrap credit">
           {footer.credit.before}
