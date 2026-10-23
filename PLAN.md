@@ -131,6 +131,14 @@ Status 2026-10-22: the snapshot works (goreleaser v2.10.2 in Docker).
 
 **Done on `chore/launch-prep`:**
 - **Distribution:** `.goreleaser.yaml` publishes to `firatmio/scoop-bucket` and `firatmio/homebrew-tap`. It uses a Homebrew cask, with a quarantine fix for the unsigned macOS binary, and needs `TAP_GITHUB_TOKEN`. The snapshot generates both files.
+- **npm (2026-10-24, `feat/npm`, not published):**
+  - `@firatmio/aletheia` uses the esbuild-style layout: a launcher, plus one optional `@firatmio/aletheia-<os>-<cpu>` package per platform with its binary. Nothing is downloaded and no install script runs.
+  - `npm/build.mjs` builds all seven packages from goreleaser's `artifacts.json`.
+  - **Tested:**
+    - Windows: install, `version`, `init`, `remember`, and MCP over `npx … serve`.
+    - Linux (`node:22-slim`): install and `version`.
+  - **Packing on Windows** loses the executable bit. The launcher restores it when it can, but publishing happens on Linux.
+  - PyPI comes later, if asked for. The name `aletheia` is taken on both npm and PyPI.
 - **Claude Code plugin:**
   - The plugin is in `plugin/`, and the marketplace in `.claude-plugin/marketplace.json`. Both pass `claude plugin validate`, and the install was tried in a throwaway config.
   - Install commands: `/plugin marketplace add firatmio/aletheia`, then `/plugin install aletheia@aletheia`, then `/aletheia:setup`.
@@ -155,7 +163,9 @@ Status 2026-10-22: the snapshot works (goreleaser v2.10.2 in Docker).
 1. Create the public repos `firatmio/scoop-bucket` and `firatmio/homebrew-tap`. Fırat creates a fine-grained token with write access to them as `TAP_GITHUB_TOKEN`.
 2. Make `firatmio/aletheia` public. Upload `og.png` as the GitHub social preview; that can only be done in the web UI.
 3. Tag `v0.1.0`, then run `goreleaser release --clean` locally with `GITHUB_TOKEN` and `TAP_GITHUB_TOKEN`, since Actions are restricted.
-4. Verify on a clean machine: `go install …@latest`, `scoop install aletheia`, `brew install --cask firatmio/tap/aletheia`, and the plugin install.
+   - **npm:** run `node npm/build.mjs`, then publish the platform packages first and `@firatmio/aletheia` last. Do this in a `node:22-slim` container, because a package packed on Windows loses the binaries' executable bit; the command is at the top of `npm/build.mjs`.
+   - **What Fırat needs:** an npm account that owns the `@firatmio` scope, and a granular publish token as `NPM_TOKEN`.
+4. Verify on a clean machine: `go install …@latest`, `scoop install aletheia`, `brew install --cask firatmio/tap/aletheia`, `npx -y @firatmio/aletheia version`, and the plugin install.
 5. Site: set `released: true` in `site/src/content.ts` and deploy.
 6. Soft launch: Turkish communities, X, LinkedIn. After 1–2 weeks of feedback, Show HN.
 

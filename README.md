@@ -57,7 +57,10 @@ Install it in whichever way suits you. Every option gives you the same single bi
 go install github.com/firatmio/aletheia/cmd/aletheia@latest   # Go 1.24+
 scoop bucket add firatmio https://github.com/firatmio/scoop-bucket; scoop install aletheia   # Windows
 brew install --cask firatmio/tap/aletheia                     # macOS, Linux
+npm install -g @firatmio/aletheia                             # Node 18+, any of the three
 ```
+
+MCP clients configured with `npx` need no install: `{"command": "npx", "args": ["-y", "@firatmio/aletheia", "serve"]}`.
 
 Prebuilt archives for Linux, macOS and Windows are on the [releases page](https://github.com/firatmio/aletheia/releases).
 
@@ -98,7 +101,7 @@ An agent can also do the rest of the setup from the [agent guide](https://alethe
 
 Memories live in `.aletheia/memories/*.md` as plain Markdown. Commit them and your team, and every agent, shares one memory that verifies itself on each machine.
 
-**Upgrading:** `scoop update aletheia` or `brew upgrade --cask aletheia`. With Go, run the same `go install` again.
+**Upgrading:** `scoop update aletheia`, `brew upgrade --cask aletheia` or `npm update -g @firatmio/aletheia`. With Go, run the same `go install` again.
 - **On Windows,** a running agent keeps `aletheia.exe` open through the MCP server, so the install fails with "file in use". Quit the agent first, or move the old binary aside and install. Windows allows renaming a running exe.
 - **Which version runs:** the hooks use the new binary right away. The MCP server keeps the old one until the agent restarts.
 
