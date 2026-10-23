@@ -13,10 +13,16 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/firatmio/aletheia/releases"><img alt="Release" src="https://img.shields.io/github/v/release/firatmio/aletheia?style=flat-square&color=142033"></a>
+  <a href="https://www.npmjs.com/package/@firatmio/aletheia"><img alt="npm" src="https://img.shields.io/npm/v/%40firatmio%2Faletheia?style=flat-square&color=142033&label=npm"></a>
+  <a href="https://registry.modelcontextprotocol.io/v0/servers?search=io.github.firatmio/aletheia"><img alt="MCP Registry: io.github.firatmio/aletheia" src="https://img.shields.io/badge/MCP_Registry-io.github.firatmio%2Faletheia-142033?style=flat-square"></a>
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-142033?style=flat-square"></a>
   <img alt="Go 1.24+" src="https://img.shields.io/badge/go-1.24%2B-142033?style=flat-square">
   <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-0-0f7a5a?style=flat-square">
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-stdio-142033?style=flat-square">
+</p>
+
+<p align="center">
+  <a href="https://glama.ai/mcp/servers/firatmio/aletheia"><img alt="Aletheia MCP server on Glama" src="https://glama.ai/mcp/servers/firatmio/aletheia/badges/score.svg"></a>
 </p>
 
 <p align="center">
