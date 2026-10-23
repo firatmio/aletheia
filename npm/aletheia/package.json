@@ -1,0 +1,14 @@
+{
+  "name": "@firatmio/aletheia",
+  "version": "0.0.0",
+  "description": "Memory for coding agents that checks itself against your code. MCP server, Claude Code hooks and CLI.",
+  "keywords": ["memory", "mcp", "claude-code", "coding-agents", "context"],
+  "homepage": "https://aletheia.firattunaarslan.me",
+  "repository": { "type": "git", "url": "git+https://github.com/firatmio/aletheia.git" },
+  "license": "Apache-2.0",
+  "author": "Fırat Tuna Arslan",
+  "bin": { "aletheia": "bin/aletheia.js" },
+  "files": ["bin", "README.md", "LICENSE"],
+  "engines": { "node": ">=18" },
+  "optionalDependencies": {}
+}
