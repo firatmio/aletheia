@@ -86,8 +86,11 @@ func captureStop(e *engine.Engine, session, transcript string) {
 		}
 		switch tl.Type {
 		case "user":
-			if p := promptText(tl); p != "" {
-				flush() // a new prompt starts a new task
+			// A new prompt starts a new task. One without words (only an
+			// image) has nothing to name the task by, so its files are not
+			// captured; they must not land on the previous prompt either.
+			if p, ok := promptText(tl); ok {
+				flush()
 				st.Prompt = p
 			}
 		case "assistant":
@@ -117,34 +120,39 @@ func captureStop(e *engine.Engine, session, transcript string) {
 	}
 }
 
-// promptText returns what the person typed, or "" for tool results,
-// hook output and other machine-written user messages.
-func promptText(tl transcriptLine) string {
+// promptText returns what the person typed, and whether the message is a
+// prompt from the person at all: tool results, hook output and other
+// machine-written user messages are not. A prompt with only an image is one,
+// with no text.
+func promptText(tl transcriptLine) (string, bool) {
 	if tl.IsMeta {
-		return ""
+		return "", false
 	}
 	var s string
+	image := false
 	if json.Unmarshal(tl.Message.Content, &s) != nil {
 		var blocks []contentBlock
 		if json.Unmarshal(tl.Message.Content, &blocks) != nil {
-			return ""
+			return "", false
 		}
 		var parts []string
 		for _, b := range blocks {
-			if b.Type == "tool_result" {
-				return ""
-			}
-			if b.Type == "text" {
+			switch b.Type {
+			case "tool_result":
+				return "", false
+			case "text":
 				parts = append(parts, b.Text)
+			case "image":
+				image = true
 			}
 		}
 		s = strings.Join(parts, " ")
 	}
 	s = strings.TrimSpace(s)
 	if strings.HasPrefix(s, "<") { // slash-command wrappers, system reminders
-		return ""
+		return "", false
 	}
-	return s
+	return s, s != "" || image
 }
 
 // projectPath turns a path from the transcript into a slash-separated path

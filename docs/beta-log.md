@@ -231,3 +231,7 @@ The agent moved the old Aletheia files aside, fetched the guide with curl and fo
 - **Fix 1 · init still suggested `--claude-hooks`:** the agent had to tell the user to ignore that line. Now `init` reads `enabledPlugins` from Claude Code's settings, local then project then user. With the plugin on, it says the hooks are already there, and it warns when `--claude-hooks` would add them a second time.
 - **Fix 2 · the dry run came back empty without saying why:** the project has 6 source files, under the 25 that a code map starts at, and no memories yet. That result is correct, but the agent called it "worth checking". Now an empty dry run lists the reasons. `init` also no longer promises a code map in a project too small for one.
 - **Not Aletheia's:** the Serena MCP server failed to connect in that session.
+
+**B17 · fixed · a map labelled with the wrong prompt.** The turn that fixed B16 started from a message with only a screenshot. The Stop hook saw no text in it, took it for a machine-written message such as a tool result, and so did not start a new task. The files changed in that turn were captured under the previous prompt ("Push docs/name-decision…").
+- **The fix:** a prompt with an image now starts a new task. With no words there is nothing to name the task by, so its files are not captured. An image with text is labelled by the text.
+- **Test:** `TestStopHookStartsANewTaskOnAnImageOnlyPrompt`, which fails on the old code.

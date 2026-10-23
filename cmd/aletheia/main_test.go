@@ -611,3 +611,52 @@ func TestServeStartsWithoutAStore(t *testing.T) {
 		t.Fatalf("serve without a store: code %d, out %q, err %q", code, out, errOut)
 	}
 }
+
+func TestStopHookStartsANewTaskOnAnImageOnlyPrompt(t *testing.T) {
+	t.Setenv("ALETHEIA_DIR", "")
+	dir := t.TempDir()
+	// Separate folders, so no map replaces another as the same kind of change.
+	for _, d := range []string{"api", "ui", "auth"} {
+		if err := os.MkdirAll(filepath.Join(dir, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeFile(t, dir, "api/routes.go", "package x\n")
+	writeFile(t, dir, "ui/hints.go", "package x\n")
+	writeFile(t, dir, "auth/header.go", "package x\n")
+	runCLI(t, dir, "", "init")
+	transcript := filepath.Join(t.TempDir(), "session.jsonl")
+	turn := func(content any, file string) {
+		t.Helper()
+		f, err := os.OpenFile(transcript, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, l := range []any{
+			map[string]any{"type": "user", "message": map[string]any{"content": content}},
+			map[string]any{"type": "assistant", "message": map[string]any{"content": []any{
+				map[string]any{"type": "tool_use", "name": "Edit", "input": map[string]any{"file_path": filepath.Join(dir, filepath.FromSlash(file))}},
+			}}},
+		} {
+			data, _ := json.Marshal(l)
+			f.Write(append(data, '\n'))
+		}
+		f.Close()
+		in, _ := json.Marshal(map[string]string{"hook_event_name": "Stop", "session_id": "s-img", "cwd": dir, "transcript_path": transcript})
+		run([]string{"hook"}, bytes.NewReader(in), &bytes.Buffer{}, &bytes.Buffer{})
+	}
+	image := map[string]any{"type": "image", "source": map[string]any{"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgo="}}
+
+	turn("Split the routes by version", "api/routes.go")
+	turn([]any{image}, "ui/hints.go") // a screenshot, no words
+	turn([]any{image, map[string]any{"type": "text", "text": "Fix the header shown here"}}, "auth/header.go")
+
+	_, out, _ := runCLI(t, dir, "", "recall", "--limit", "20")
+	if !strings.Contains(out, `"Split the routes by version" changed api/routes.go`) ||
+		!strings.Contains(out, `"Fix the header shown here" changed auth/header.go`) {
+		t.Fatalf("prompts with words should still name their maps: %q", out)
+	}
+	if strings.Contains(out, "ui/hints.go") {
+		t.Fatalf("an image-only prompt starts a new task; its files must not join the previous one: %q", out)
+	}
+}
