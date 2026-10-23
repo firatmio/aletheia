@@ -31,7 +31,7 @@ import (
 var agentsSnippet string
 
 // version is overridden at release time with -ldflags "-X main.version=...".
-var version = "0.1.0"
+var version = "0.1.1"
 
 const (
 	exitOK       = 0

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.firatmio/aletheia",
+  "title": "Aletheia",
+  "description": "Project memory for coding agents whose memories carry code evidence, re-checked on every recall.",
+  "repository": {
+    "url": "https://github.com/firatmio/aletheia",
+    "source": "github"
+  },
+  "websiteUrl": "https://aletheia.firattunaarslan.me",
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@firatmio/aletheia",
+      "version": "0.1.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "serve"
+        }
+      ]
+    }
+  ]
+}

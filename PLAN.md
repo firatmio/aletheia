@@ -193,10 +193,23 @@ Status 2026-10-22: the snapshot works (goreleaser v2.10.2 in Docker).
 - **Glama:** submitted by Fırat. It can be claimed with GitHub sign-in; a personal repository needs no `glama.json`.
 - **Anthropic plugin directory:** `plugin/README.md` now exists. The directory requires a README of 40 words or more in the plugin folder, and the README says what the plugin runs and reads.
 - **Official MCP Registry:** `npm/aletheia/package.json` now carries `"mcpName": "io.github.firatmio/aletheia"`. It only takes effect once it is published.
-- **Next release, v0.1.1:**
-  1. Raise `version` in `plugin/.claude-plugin/plugin.json`, or plugin users keep 0.1.0.
-  2. Tag and release, then publish to npm.
-  3. Run `mcp-publisher login github`, then `mcp-publisher publish` with `launch/server.json` (versions 0.1.1).
+- **v0.1.1, prepared on `release/v0.1.1`, not released:**
+  - **Versions:** `cmd/aletheia/main.go` and `plugin/.claude-plugin/plugin.json` say 0.1.1. npm takes the tag's version.
+  - **Notes:** `docs/releases/v0.1.1.md` are the release notes, and `CHANGELOG.md` was started. goreleaser's own changelog would be empty, because it skips `chore:` and `docs:` commits.
+  - **Registry metadata:** `server.json` in the repository root is the MCP Registry entry (`io.github.firatmio/aletheia`, npm `@firatmio/aletheia@0.1.1`, stdio, argument `serve`). Every required field and constraint was checked against the 2025-12-11 schema.
+
+**Releasing v0.1.1, in order:**
+1. Merge `release/v0.1.1`, then tag `v0.1.1` on that commit and push the tag.
+2. **Release:** run goreleaser with the notes. The tap token must reach `scoop-bucket` and `homebrew-tap` now.
+   `docker run --rm -v "C:/source/aletheia:/src" -w /src -e GITHUB_TOKEN -e TAP_GITHUB_TOKEN -e GOFLAGS=-buildvcs=false goreleaser/goreleaser:v2.10.2 release --clean --release-notes docs/releases/v0.1.1.md`
+3. **npm:** use the command at the top of `npm/build.mjs`, then approve the staged versions on npmjs.com.
+4. **MCP Registry:**
+   - Install `mcp-publisher` (a release binary from `modelcontextprotocol/registry`, or `brew install mcp-publisher`).
+   - In the repository root: `mcp-publisher validate`, `mcp-publisher login github` (device code, as firatmio), then `mcp-publisher publish`.
+   - Check: `curl "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.firatmio/aletheia"`.
+5. **Plugin directory:** click "Check for new commits" in the developer portal, or set up its webhook, so plugin 0.1.1 is picked up.
+6. **Verify each channel:** `npx -y @firatmio/aletheia@0.1.1 version`, `go install …@latest`, the Scoop manifest, and the cask on Linux.
+7. Put the date on the 0.1.1 heading in `CHANGELOG.md`.
 
 ### 4.4 Brand, README and landing page (decided with Fırat, 2026-10-21)
 - **No mascot.** The owl was dropped, and an anchor character was tried and dropped. Generated or stock imagery did not match.
