@@ -145,8 +145,9 @@ func (e *Engine) judge(m *store.Memory, scan *goScan) Verdict {
 			v.Reasons = append(v.Reasons, "bad anchor")
 			bad = true
 		case o.r.OK:
-			if o.r.Line > 0 {
-				v.Pointers = append(v.Pointers, pointer(o.a.Path, o.r.Line, o.r.EndLine))
+			// A contains anchor and the symbol added for it often point at one line.
+			if p := pointer(o.a.Path, o.r.Line, o.r.EndLine); o.r.Line > 0 && !slices.Contains(v.Pointers, p) {
+				v.Pointers = append(v.Pointers, p)
 			}
 		// Code that moved unchanged keeps the claim true only if the claim
 		// does not name the old file.
@@ -159,7 +160,13 @@ func (e *Engine) judge(m *store.Memory, scan *goScan) Verdict {
 				v.Pointers = append(v.Pointers, p)
 			}
 		default:
-			v.Reasons = append(v.Reasons, o.r.Detail)
+			r := o.r.Detail
+			if len(o.changed) > 0 { // found by name elsewhere, but not the same code
+				r = o.a.Arg + " changed (now in " + strings.Join(o.changed, ", ") + ")"
+			}
+			if !slices.Contains(v.Reasons, r) {
+				v.Reasons = append(v.Reasons, r)
+			}
 			stale = true
 		}
 	}

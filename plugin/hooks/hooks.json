@@ -1,0 +1,6 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "aletheia hook" }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "aletheia hook" }] }]
+  }
+}

@@ -81,6 +81,8 @@ Claude Code: the user runs this in the project root. It adds the UserPromptSubmi
 aletheia init --claude-hooks
 \`\`\`
 
+The Claude Code plugin is an alternative to this step: \`/plugin marketplace add firatmio/aletheia\`, then \`/plugin install aletheia@aletheia\`. It brings the hooks and the MCP server, so skip \`--claude-hooks\` when the plugin is installed, or the hooks run twice.
+
 Agents are usually not allowed to edit their own hooks, by design. Show the user the command above, or this block if they prefer to edit the file:
 
 \`\`\`json

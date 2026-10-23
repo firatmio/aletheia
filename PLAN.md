@@ -126,6 +126,33 @@ Status 2026-10-22: the snapshot works (goreleaser v2.10.2 in Docker).
 - **Fix needed:** `go.mod` said `go 1.24.7` since the scaffold, so Go 1.24.0–1.24.6 either downloaded a toolchain or failed (`GOTOOLCHAIN=local`), and the snapshot failed in goreleaser's image (Go 1.24.4). It is now `go 1.24`, matching the README's "Go 1.24+". Tests pass on Go 1.24.0 with `GOTOOLCHAIN=local`.
 - **Left:** tagging `v0.1.0` and the real release wait for the repository to go public. The release workflow cannot run while Actions are restricted; `goreleaser release --clean` can run locally with a token.
 
+### 4.3.1 Launch (decided with Fırat, 2026-10-23)
+**Decisions:** demo GIF and og:image, Scoop + Homebrew, a soft launch then Show HN, a Claude Code plugin at launch.
+
+**Done on `chore/launch-prep`:**
+- **Distribution:** `.goreleaser.yaml` publishes to `firatmio/scoop-bucket` and `firatmio/homebrew-tap`. It uses a Homebrew cask, with a quarantine fix for the unsigned macOS binary, and needs `TAP_GITHUB_TOKEN`. The snapshot generates both files.
+- **Claude Code plugin:**
+  - The plugin is in `plugin/`, and the marketplace in `.claude-plugin/marketplace.json`. Both pass `claude plugin validate`, and the install was tried in a throwaway config.
+  - Install commands: `/plugin marketplace add firatmio/aletheia`, then `/plugin install aletheia@aletheia`, then `/aletheia:setup`.
+  - `serve` now starts without a store, so the plugin works in projects without `.aletheia/`.
+  - **Not tried:** a live session with the plugin.
+- **Images:** `assets/demo.gif`, recorded from `assets/demo.tape` with VHS in Docker. `site/public/og.png` (1200×630), rendered from `site/scripts/og.html` with headless Chrome.
+- **Verdict fix:** one pointer per line, one reason per cause, and "X changed (now in Y)" in the stale reason.
+- **Drafts:** `launch/drafts.md`, git-excluded. It has the Turkish and English soft-launch posts, the Show HN text and reply notes.
+
+**Name check (2026-10-23):**
+- **Google DeepMind's "Aletheia"** (Feb 2026) is a math research agent and the best-known AI use of the name.
+- **Small GitHub repos:** `khaledgabal2/aletheia-memory` ("Local, auditable memory for AI agents", 2 stars) and two other `aletheia-memory` repos with no stars.
+- **Open:** keep the name or not. That is Fırat's call.
+
+**Go-live, in order. Each outward step needs Fırat's go-ahead:**
+1. Create the public repos `firatmio/scoop-bucket` and `firatmio/homebrew-tap`. Fırat creates a fine-grained token with write access to them as `TAP_GITHUB_TOKEN`.
+2. Make `firatmio/aletheia` public. Upload `og.png` as the GitHub social preview; that can only be done in the web UI.
+3. Tag `v0.1.0`, then run `goreleaser release --clean` locally with `GITHUB_TOKEN` and `TAP_GITHUB_TOKEN`, since Actions are restricted.
+4. Verify on a clean machine: `go install …@latest`, `scoop install aletheia`, `brew install --cask firatmio/tap/aletheia`, and the plugin install.
+5. Site: set `released: true` in `site/src/content.ts` and deploy.
+6. Soft launch: Turkish communities, X, LinkedIn. After 1–2 weeks of feedback, Show HN.
+
 ### 4.4 Brand, README and landing page (decided with Fırat, 2026-10-21)
 - **No mascot.** The owl was dropped, and an anchor character was tried and dropped. Generated or stock imagery did not match.
 - **Mark: ἀ**, the alpha of ἀλήθεια, with the breathing mark in "verified" green.
@@ -139,13 +166,11 @@ Status 2026-10-22: the snapshot works (goreleaser v2.10.2 in Docker).
   - draft is the claude.ai artifact "Aletheia Landing Draft";
   - to be hosted on `aletheia.firattunaarslan.me`;
   - plain HTML with no dependencies.
-- **Still to do:**
-  - record the demo GIF with VHS in Docker, after R5;
-  - make the social preview PNG (1280×640; GitHub does not take SVG).
+- **Done (2026-10-23):** the demo GIF (`assets/demo.gif`) and the social card (`site/public/og.png`); see 4.3.1.
 - **Landing page (2026-10-22):** `site/`, Vite + Solid with bun, prerendered at build time. All copy is in `site/src/content.ts`; set `released: true` there when the repo goes public.
   - Deployed with the Vercel CLI to project `aletheia`: https://aletheia-rho-ten.vercel.app.
   - `aletheia.firattunaarslan.me` is attached; it needs a CNAME `aletheia` → `f9f7168c64c92b2c.vercel-dns-017.com` at Namecheap.
-  - Still to do: the "try it" block (edit a line, watch the memory go stale) and an og:image.
+  - Still to do: the "try it" block (edit a line, watch the memory go stale).
 - **Site redesign (decided with Fırat, 2026-10-22):** storyboard in the claude.ai artifact "Aletheia Site Storyboard".
   - **Palette:** grounds and surfaces are pure neutral grays (no blue tint), dark by default. Dark: #0a0a0a / #141414 / #1c1c1c, line #2a2a2a, text #f5f5f5. Light is the same grays reversed.
   - **Accents:** color only carries meaning. Verified #3fc69a/#0f7a5a, stale #e3a14a/#a85f00, broken #f87171/#c0352b (ghost panel only), pointer #8fb4ff/#2f5bd3.

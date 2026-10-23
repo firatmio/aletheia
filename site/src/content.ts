@@ -205,7 +205,11 @@ export const quickstart = {
       id: "claude",
       label: "Claude Code",
       blocks: [
-        { note: "Install and set up the project:", code: `${site.install}\ncd your-project\naletheia init --agents --claude-hooks` },
+        {
+          note: "The plugin brings the MCP server and both hooks. Install the binary first (go install, Scoop or Homebrew), then in Claude Code:",
+          code: "/plugin marketplace add firatmio/aletheia\n/plugin install aletheia@aletheia\n/aletheia:setup",
+        },
+        { note: "Or without the plugin, install and set up the project:", code: `${site.install}\ncd your-project\naletheia init --agents --claude-hooks` },
         {
           note: "--claude-hooks merges two hooks into .claude/settings.json and keeps your other settings. Recall then happens on every prompt and costs the agent nothing. Check what an agent would get:",
           code: `aletheia hook --dry-run`,

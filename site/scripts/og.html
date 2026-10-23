@@ -1,0 +1,44 @@
+<!doctype html>
+<!--
+  The social card, public/og.png (1200×630). Rendered with headless Chrome or Edge, from site/:
+    chrome --headless=new --hide-scrollbars --force-device-scale-factor=1 --window-size=1200,630 --screenshot=public/og.png scripts/og.html
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: "Newsreader"; font-style: normal; src: url("../node_modules/@fontsource/newsreader/files/newsreader-latin-400-normal.woff2"); }
+  @font-face { font-family: "Newsreader"; font-style: italic; src: url("../node_modules/@fontsource/newsreader/files/newsreader-latin-400-italic.woff2"); }
+  @font-face { font-family: "IBM Plex Sans"; src: url("../node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2"); }
+  @font-face { font-family: "IBM Plex Mono"; src: url("../node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2"); }
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: #0a0a0a; color: #f5f5f5; }
+  .card { position: relative; width: 1200px; height: 630px; overflow: hidden; }
+  .art { position: absolute; inset: 0; background: radial-gradient(ellipse 60% 70% at 30% 55%, #0a0a0a, transparent), url("../public/sacred-grove.webp") center 30% / cover no-repeat; opacity: 0.34; filter: blur(1.5px);
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 35%, transparent 100%); }
+  .body { position: absolute; inset: 0; padding: 64px 76px; display: flex; flex-direction: column; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand img { width: 46px; height: 46px; }
+  .brand span { font: italic 400 34px/1 "Newsreader"; }
+  .brand .url { margin-left: auto; font: 400 20px/1 "IBM Plex Mono"; color: #8a8a8a; }
+  h1 { margin: 64px 0 0; font: 400 92px/1 "Newsreader"; letter-spacing: -0.02em; }
+  h1 em { font-style: italic; }
+  p { margin: 26px 0 0; max-width: 820px; font: 400 27px/1.45 "IBM Plex Sans"; color: #a3a3a3; }
+  .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: baseline; font: 400 20px/1 "IBM Plex Mono"; color: #8a8a8a; }
+  .ok { color: #3fc69a; }
+  .ptr { color: #8fb4ff; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="art"></div>
+    <div class="body">
+      <div class="brand"><img src="../../assets/brand/aletheia-mark-dark.svg" alt=""><span>aletheia</span><span class="url">aletheia.firattunaarslan.me</span></div>
+      <h1>Memory your agent<br>can <em>verify.</em></h1>
+      <p>Every memory carries evidence from your code, re-checked on every recall. Stale facts never reach the context.</p>
+      <div class="foot">
+        <span><span class="ok">[ok]</span> builtins register in Builtins <span class="ptr">(builtin/registry.go:14-38)</span></span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

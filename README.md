@@ -26,7 +26,9 @@
   <a href="#reference">Reference</a>
 </p>
 
-<!-- Demo GIF of a real Claude Code session goes here (recorded with VHS). -->
+<p align="center">
+  <img src="assets/demo.gif" alt="A memory is saved with evidence and recalled as [ok] with its line. The file is moved and recall shows it as [moved] at its new place. The value is changed and recall hides the memory; verify says why: MaxDiscount changed." width="100%">
+</p>
 
 ## The problem
 
@@ -49,14 +51,32 @@ Coding agents forget everything between sessions, so they re-read the same files
 
 ## Quick start
 
-```bash
-go install github.com/firatmio/aletheia/cmd/aletheia@latest
+Install it in whichever way suits you. Every option gives you the same single binary:
 
+```bash
+go install github.com/firatmio/aletheia/cmd/aletheia@latest   # Go 1.24+
+scoop bucket add firatmio https://github.com/firatmio/scoop-bucket; scoop install aletheia   # Windows
+brew install --cask firatmio/tap/aletheia                     # macOS, Linux
+```
+
+Prebuilt archives for Linux, macOS and Windows are on the [releases page](https://github.com/firatmio/aletheia/releases).
+
+Then set it up in your project:
+
+```bash
 cd your-project
 aletheia init --agents     # creates .aletheia/ and adds usage notes to CLAUDE.md and AGENTS.md
 ```
 
-For Claude Code, add the two hooks. Recall then happens on every prompt and costs the agent nothing:
+**Claude Code plugin.** The plugin brings the MCP server and both hooks. `/aletheia:setup` then initializes the project:
+
+```text
+/plugin marketplace add firatmio/aletheia
+/plugin install aletheia@aletheia
+/aletheia:setup
+```
+
+Without the plugin, add the two hooks yourself. Recall then happens on every prompt and costs the agent nothing:
 
 ```bash
 aletheia init --claude-hooks   # merges them into .claude/settings.json, keeps your other settings
@@ -78,7 +98,7 @@ An agent can also do the rest of the setup from the [agent guide](https://alethe
 
 Memories live in `.aletheia/memories/*.md` as plain Markdown. Commit them and your team, and every agent, shares one memory that verifies itself on each machine.
 
-**Upgrading:** run the same `go install` again.
+**Upgrading:** `scoop update aletheia` or `brew upgrade --cask aletheia`. With Go, run the same `go install` again.
 - **On Windows,** a running agent keeps `aletheia.exe` open through the MCP server, so the install fails with "file in use". Quit the agent first, or move the old binary aside and install. Windows allows renaming a running exe.
 - **Which version runs:** the hooks use the new binary right away. The MCP server keeps the old one until the agent restarts.
 

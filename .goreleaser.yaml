@@ -26,6 +26,33 @@ archives:
 checksum:
   name_template: checksums.txt
 
+# Scoop bucket and Homebrew tap. Pushing to these repositories needs a token
+# with write access to them: TAP_GITHUB_TOKEN (GITHUB_TOKEN in Actions only
+# reaches this repository).
+scoops:
+  - repository:
+      owner: firatmio
+      name: scoop-bucket
+      token: '{{ envOrDefault "TAP_GITHUB_TOKEN" "" }}'
+    homepage: https://aletheia.firattunaarslan.me
+    description: Memory for coding agents that checks itself against your code.
+    license: Apache-2.0
+
+homebrew_casks:
+  - repository:
+      owner: firatmio
+      name: homebrew-tap
+      token: '{{ envOrDefault "TAP_GITHUB_TOKEN" "" }}'
+    homepage: https://aletheia.firattunaarslan.me
+    description: Memory for coding agents that checks itself against your code.
+    # The binaries are not notarized; without this macOS quarantines them.
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/aletheia"]
+          end
+
 changelog:
   sort: asc
   filters:
