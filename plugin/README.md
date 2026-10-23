@@ -16,7 +16,7 @@ Then run `/aletheia:setup` in a project. It runs `aletheia init --agents`, which
 ## What the plugin runs
 
 - **UserPromptSubmit hook:** `aletheia hook`. Reads the prompt, the project's `.aletheia/` memories and the project's source files, and adds the verified memories and a small code map to Claude's context.
-- **Stop hook:** `aletheia hook`. Reads the session transcript file that Claude Code names, and records which project files the task edited as a Markdown memory in `.aletheia/`.
+- **Stop hook:** `aletheia hook`. Reads the session transcript file that Claude Code names, and records which project files the task edited as a Markdown memory in `.aletheia/`. That memory is labelled with the task's prompt, shortened to 140 characters. It stays in the project, on your machine.
 - **MCP server:** `aletheia serve` over stdio, with the tools `recall`, `remember`, `get` and `verify`.
 - **Skill:** `/aletheia:setup`, the setup steps above.
 
