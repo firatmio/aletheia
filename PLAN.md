@@ -189,6 +189,15 @@ Status 2026-10-22: the snapshot works (goreleaser v2.10.2 in Docker).
   - **npm staged publishing:** npm first showed a `0.0.0-stage` placeholder for each package. The real versions went live after approval.
   - **Half-run release:** if goreleaser stops partway, it writes no `dist/artifacts.json`, and `npm/build.mjs` needs that file.
 
+**Directories (2026-10-24):** the texts are in `launch/directories.md`, which is local and not committed.
+- **Glama:** submitted by Fırat. It can be claimed with GitHub sign-in; a personal repository needs no `glama.json`.
+- **Anthropic plugin directory:** `plugin/README.md` now exists. The directory requires a README of 40 words or more in the plugin folder, and the README says what the plugin runs and reads.
+- **Official MCP Registry:** `npm/aletheia/package.json` now carries `"mcpName": "io.github.firatmio/aletheia"`. It only takes effect once it is published.
+- **Next release, v0.1.1:**
+  1. Raise `version` in `plugin/.claude-plugin/plugin.json`, or plugin users keep 0.1.0.
+  2. Tag and release, then publish to npm.
+  3. Run `mcp-publisher login github`, then `mcp-publisher publish` with `launch/server.json` (versions 0.1.1).
+
 ### 4.4 Brand, README and landing page (decided with Fırat, 2026-10-21)
 - **No mascot.** The owl was dropped, and an anchor character was tried and dropped. Generated or stock imagery did not match.
 - **Mark: ἀ**, the alpha of ἀλήθεια, with the breathing mark in "verified" green.

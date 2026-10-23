@@ -7,6 +7,7 @@
   "repository": { "type": "git", "url": "git+https://github.com/firatmio/aletheia.git" },
   "license": "Apache-2.0",
   "author": "Fırat Tuna Arslan",
+  "mcpName": "io.github.firatmio/aletheia",
   "bin": { "aletheia": "bin/aletheia.js" },
   "files": ["bin", "README.md", "LICENSE"],
   "engines": { "node": ">=18" },
