@@ -40,7 +40,7 @@ const (
 	exitConflict = 3
 )
 
-const usage = `aletheia: memory for AI agents that checks itself against reality
+const usage = `aletheia: memory for coding agents that checks itself against your code
 
 Usage:
   aletheia init [dir] [--agents] [--claude-hooks]
