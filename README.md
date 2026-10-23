@@ -95,12 +95,13 @@ go install github.com/firatmio/aletheia/cmd/aletheia@latest
 
 We measured with headless Claude Code (Opus 5.5) on real repositories. Each task ran with and without Aletheia, and the same hidden acceptance tests judged success.
 
-| Repository | Tasks | Cost | Read before first edit | Tasks passed |
+| Repository | Tasks | Cost | Also | Tasks passed |
 |---|---|---|---|---|
-| [expr-lang/expr](https://github.com/expr-lang/expr), a mid-size expression language | 4 related tasks, 3 runs each | **−12%** | **−60%** on the first task | 12/12, same as without |
-| [go-chi/chi](https://github.com/go-chi/chi), a small, tidy router | 7 small tasks, paired | +5% | less on 5 of 7 tasks | 7/7, same as without |
+| [gohugoio/hugo](https://github.com/gohugoio/hugo), a large site generator (233k lines of Go) | 14 tasks of five kinds, one run each | **−15%**: −22% on seven tasks of one kind, −7% on a mix | input tokens −27%, turns −21% | 14/14, same as without |
+| [expr-lang/expr](https://github.com/expr-lang/expr), a mid-size expression language | 7 tasks, two runs | **−9%** in both runs | code read before the first edit −48% | 14/14, same as without |
+| [go-chi/chi](https://github.com/go-chi/chi), a small, tidy router | 7 small tasks, two runs | +5% and −5%: break-even | | 14/14, same as without |
 
-Aletheia pays off where finding the right place is expensive, in mid-size and larger codebases. On a small package that an agent reads in one or two calls there is little to save. The method, the raw numbers and what did not work are in [docs/dogfood-4.2.md](docs/dogfood-4.2.md).
+Aletheia pays off where finding the right place is expensive, in mid-size and larger codebases, and most when the same kind of change comes back. Expect the mixed figure for everyday work. On a small package that an agent reads in one or two calls there is little to save. The method, the raw numbers and what did not work are in [docs/dogfood-4.2.md](docs/dogfood-4.2.md).
 
 ## Reference
 

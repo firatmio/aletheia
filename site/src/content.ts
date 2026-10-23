@@ -170,14 +170,14 @@ export const proof = {
   eyebrow: "Results",
   title: "Measured, with the method attached.",
   figures: [
-    { value: "−22%", label: "cost on gohugoio/hugo (233k lines), seven tasks" },
+    { value: "−15%", label: "cost on gohugoio/hugo (233k lines), 14 tasks of five kinds" },
     { value: "−9%", label: "cost on expr-lang/expr, in two separate runs" },
-    { value: "28/28", label: "sessions passed the hidden tests, as without Aletheia" },
+    { value: "42/42", label: "sessions passed the hidden tests, as without Aletheia" },
   ],
   notes: [
-    "R6 on Hugo: seven new template functions, each run with and without Aletheia by headless Claude Code (Opus 5.5). Input tokens −38%, turns −31%. One run, and all tasks of one kind.",
+    "R6 and R7 on Hugo, each task run with and without Aletheia by headless Claude Code (Opus 5.5): −22% on seven new template functions, −7% on a mix of new functions, helpers and behaviour changes. One run each.",
     "R5 and R6 on expr-lang/expr: the same seven tasks, −9% both times; code read before the first edit −48%.",
-    "Hidden acceptance tests and the full test suite judged every session of R6.",
+    "Hidden acceptance tests and the full test suite judged every session of R6 and R7.",
   ],
   caveat: "Small, tidy code saves nothing: +5% on go-chi/chi (R4).",
   methodLink: "Method and raw numbers",
