@@ -95,6 +95,17 @@ h1 em { font-style: italic; }
 .lede { margin: 0; max-width: 620px; font-size: 18px; color: var(--soft); }
 .hero-actions { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; max-width: 100%; }
 .install { display: flex; align-items: center; gap: 12px; max-width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 6px 6px 14px; }
+/* Install picker: a row of small tabs above the command. The button beside
+   it lines up with the command box, not with the tabs. */
+.hero-actions { align-items: flex-end; }
+.installer { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 0; width: 560px; max-width: 100%; } /* one width for every command, so switching tabs moves nothing */
+.installer .install code { flex: 1; text-align: left; }
+.install-tabs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.install-tabs button { padding: 5px 10px; border: 1px solid transparent; border-radius: 999px; background: transparent; color: var(--dim); font: 500 12px/1 var(--mono); cursor: pointer; transition: color 0.15s, border-color 0.15s, background-color 0.15s; }
+.install-tabs button:hover { color: var(--text); }
+.install-tabs button.on { color: var(--text); background: color-mix(in srgb, var(--surface) 72%, transparent); border-color: color-mix(in srgb, var(--text) 14%, transparent); }
+.install-tabs button:focus-visible { outline: 2px solid var(--ok); outline-offset: 1px; }
+.install-note { margin-left: auto; padding-left: 8px; font: 400 12px/1 var(--mono); color: var(--dim); }
 .install code { font-size: 13px; white-space: nowrap; overflow-x: auto; min-width: 0; }
 .soon { margin: -8px 0 0; font-size: 13px; color: var(--dim); }
 /* Puvis de Chavannes, The Sacred Grove (1884–89), in gray behind the hero,

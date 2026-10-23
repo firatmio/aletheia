@@ -47,6 +47,67 @@ function HeroArt() {
   );
 }
 
+// The hero's install command, with a tab per way to install. The choice is
+// remembered for the visitor; Go is the default, as in the prerendered page.
+function InstallPicker() {
+  let code!: HTMLElement;
+  const tabs: HTMLButtonElement[] = [];
+  const [pick, setPick] = createSignal(0);
+  const current = () => site.installs[pick()];
+  onMount(() => {
+    try {
+      const i = site.installs.findIndex((m) => m.id === localStorage.getItem("install"));
+      if (i >= 0) setPick(i);
+    } catch {}
+  });
+  const choose = (i: number, focus = false) => {
+    setPick(i);
+    if (focus) tabs[i]?.focus();
+    try {
+      localStorage.setItem("install", site.installs[i].id);
+    } catch {}
+  };
+  const keys = (e: KeyboardEvent) => {
+    const n = site.installs.length;
+    const step = { ArrowRight: 1, ArrowLeft: n - 1 }[e.key];
+    if (step) {
+      e.preventDefault();
+      choose((pick() + step) % n, true);
+    }
+  };
+  return (
+    <div class="installer">
+      <div class="install-tabs" role="tablist" aria-label="Install with" onKeyDown={keys}>
+        <For each={site.installs}>
+          {(m, i) => (
+            <button
+              ref={(el) => (tabs[i()] = el)}
+              type="button"
+              role="tab"
+              id={`install-${m.id}`}
+              aria-selected={pick() === i()}
+              aria-controls="install-cmd"
+              tabindex={pick() === i() ? 0 : -1}
+              classList={{ on: pick() === i() }}
+              onClick={() => choose(i())}
+            >
+              {m.label}
+            </button>
+          )}
+        </For>
+        <span class="install-note">{current().note}</span>
+      </div>
+      <div class="install" id="install-cmd" role="tabpanel" aria-labelledby={`install-${current().id}`}>
+        <code ref={code}>
+          <span class="dim">$ </span>
+          {current().cmd}
+        </code>
+        <Copy text={current().cmd} target={() => code} />
+      </div>
+    </div>
+  );
+}
+
 // The GitHub mark (Octicons, MIT), in the text colour.
 function GitHubMark() {
   return (
@@ -97,7 +158,6 @@ function ThemeToggle() {
 }
 
 export default function App() {
-  let cmd: HTMLElement | undefined;
   return (
     <>
       <header class="top">
@@ -140,13 +200,7 @@ export default function App() {
           </h1>
           <p class="lede">{hero.lede}</p>
           <div class="hero-actions">
-            <div class="install">
-              <code ref={cmd}>
-                <span class="dim">$ </span>
-                {site.install}
-              </code>
-              <Copy text={site.install} target={() => cmd} />
-            </div>
+            <InstallPicker />
             <a class="btn solid" href="#story">
               {hero.cta} ↓
             </a>
