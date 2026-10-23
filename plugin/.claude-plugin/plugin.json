@@ -1,7 +1,7 @@
 {
   "name": "aletheia",
   "displayName": "Aletheia",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Verified project memory: recall on every prompt, maps captured when a task ends, stale facts kept out of context.",
   "author": { "name": "Fırat Tuna Arslan", "url": "https://github.com/firatmio" },
   "homepage": "https://aletheia.firattunaarslan.me",
