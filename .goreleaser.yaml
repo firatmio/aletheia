@@ -9,6 +9,8 @@ builds:
       - CGO_ENABLED=0
     flags:
       - -trimpath
+    # Reproducible archives: a rerun of a release produces the same files.
+    mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
       - -s -w -X main.version={{ .Version }}
     goos: [linux, darwin, windows]
@@ -33,7 +35,7 @@ scoops:
   - repository:
       owner: firatmio
       name: scoop-bucket
-      token: '{{ envOrDefault "TAP_GITHUB_TOKEN" "" }}'
+      token: '{{ .Env.TAP_GITHUB_TOKEN }}'
     homepage: https://aletheia.firattunaarslan.me
     description: Memory for coding agents that checks itself against your code.
     license: Apache-2.0
@@ -42,14 +44,15 @@ homebrew_casks:
   - repository:
       owner: firatmio
       name: homebrew-tap
-      token: '{{ envOrDefault "TAP_GITHUB_TOKEN" "" }}'
+      token: '{{ .Env.TAP_GITHUB_TOKEN }}'
     homepage: https://aletheia.firattunaarslan.me
     description: Memory for coding agents that checks itself against your code.
     # The binaries are not notarized; without this macOS quarantines them.
+    # Linux has no xattr, and calling it there fails the install.
     hooks:
       post:
         install: |
-          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+          if OS.mac?
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/aletheia"]
           end
 

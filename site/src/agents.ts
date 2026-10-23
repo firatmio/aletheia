@@ -55,7 +55,7 @@ aletheia version
 ${site.install}
 \`\`\`
 
-Go 1.24 or newer.
+Go 1.24 or newer. Without Go, any one of these installs the same binary: \`npm install -g @firatmio/aletheia\` (Node 18+), \`scoop bucket add firatmio https://github.com/firatmio/scoop-bucket; scoop install aletheia\` (Windows), \`brew install --cask firatmio/tap/aletheia\` (macOS, Linux). Upgrade with the same tool (\`npm update -g\`, \`scoop update\`, \`brew upgrade --cask\`).
 ${privateInstall}
 To upgrade, run \`go install\` again. On Windows a running agent keeps \`aletheia.exe\` open, so move it aside first. This works every time: old copies that are no longer in use are removed, and the new name never collides with one that still is:
 

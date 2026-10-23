@@ -169,6 +169,26 @@ Status 2026-10-22: the snapshot works (goreleaser v2.10.2 in Docker).
 5. Site: set `released: true` in `site/src/content.ts` and deploy.
 6. Soft launch: Turkish communities, X, LinkedIn. After 1–2 weeks of feedback, Show HN.
 
+**v0.1.0 released (2026-10-24).** Steps 1–5 are done; step 6 is next.
+- **What is out:** the repository is public. The tag, the GitHub release with six archives and checksums, the Scoop bucket and the Homebrew tap, all seven npm packages, and the site with `released: true` (the GitHub link and every install path in `/agents.md`).
+- **Verified from clean environments:**
+  - `go install …@latest` in `golang:1.24`.
+  - `npx`, and a global npm install, on Linux.
+  - `npx` on Windows, including `npx … serve` over MCP.
+  - `brew install --cask firatmio/tap/aletheia` in `homebrew/brew` on Linux.
+  - The Scoop manifest: URLs, hashes and the zip contents. It was not installed, to keep Fırat's PATH clean.
+  - The plugin from `firatmio/aletheia`, in a throwaway Claude config.
+  - **Not tested:** macOS. There is no Mac available.
+- **What went wrong, and is fixed on `chore/after-v0.1.0`:**
+  - **Template:** `envOrDefault` does not exist in goreleaser v2.10.2, so the tap and bucket publish failed. The config now uses `.Env.TAP_GITHUB_TOKEN`. Snapshots and `--skip=publish` never evaluate publish templates, so test a token template with a real publish.
+  - **Cask on Linux:** the quarantine postflight called `/usr/bin/xattr` on Linux and failed the install. It is now `if OS.mac?`, and the cask in the tap was fixed by hand.
+  - **Reproducible archives:** `mod_timestamp` is set to the commit time, so a rerun of a release produces the same files.
+- **Things to know for the next release:**
+  - **Token access:** the fine-grained `TAP_GITHUB_TOKEN` needs Contents: read and write on `scoop-bucket` and `homebrew-tap`. A token made before those repositories existed did not reach them (403). This time the two files were pushed with `gh api`.
+  - **Dirty tree in Docker:** git in the goreleaser container does not see the user's global gitignore. Untracked local files must be in `.git/info/exclude`, or the tree counts as dirty.
+  - **npm staged publishing:** npm first showed a `0.0.0-stage` placeholder for each package. The real versions went live after approval.
+  - **Half-run release:** if goreleaser stops partway, it writes no `dist/artifacts.json`, and `npm/build.mjs` needs that file.
+
 ### 4.4 Brand, README and landing page (decided with Fırat, 2026-10-21)
 - **No mascot.** The owl was dropped, and an anchor character was tried and dropped. Generated or stock imagery did not match.
 - **Mark: ἀ**, the alpha of ἀλήθεια, with the breathing mark in "verified" green.
