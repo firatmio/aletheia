@@ -12,6 +12,7 @@
 | `assets/brand/aletheia-mark-mono.svg` | One-color contexts (print, stamps, single-ink) |
 | `assets/brand/aletheia-mark-adaptive.svg` | Follows the viewer's light or dark preference |
 | `assets/brand/favicon.svg` | Favicon and app icon: the mark on an ink tile |
+| `plugin/.claude-plugin/icon.png` | Claude plugin directory icon: `favicon.svg` with square corners, 1024×1024 PNG (the directory takes no SVG and rounds corners itself) |
 
 ## Color
 
