@@ -13,6 +13,6 @@ This plugin already provides the MCP server and the two hooks: recall on every p
    - `brew install --cask firatmio/tap/aletheia` (macOS, Linux)
 2. In the project root, run `aletheia init --agents`. It creates `.aletheia/` and adds short usage notes to CLAUDE.md and AGENTS.md. Do not pass `--claude-hooks`: the plugin's hooks would then run twice.
 3. If `.claude/settings.json` or `.claude/settings.local.json` already has `aletheia hook` entries from an earlier manual setup, tell the user and suggest removing them. Do not edit hook settings yourself.
-4. Run `aletheia hook --dry-run` and show the user what the agent will receive.
+4. Run `aletheia hook --dry-run` and show the user what the agent will receive. In a new or small project it may add nothing; the output then says why (no memories yet, too few files for a code map), and that is expected.
 
 Memories live in `.aletheia/memories/*.md` as plain Markdown. Suggest committing them so the team shares one memory.

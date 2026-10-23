@@ -223,3 +223,11 @@ The agent moved the old Aletheia files aside, fetched the guide with curl and fo
 **B12, items 1 and 2 done** on branch `fix/launch-notes-b12`.
 - **Build stamp:** the guide now opens with "Build 2026-10-22 19:16 UTC", to the minute and different on every deploy. An agent can tell its copy is cached and stale by comparing it with what curl returns.
 - **Dry-run heading:** without a prompt the map is headed "Code map of the project" instead of "Code map for this prompt".
+
+## 2026-10-23: the Claude Code plugin, first live run (main fcb4c9d)
+
+**B16 · good, with two fixes · the plugin in a real session.** Fırat installed it from the local marketplace in a small Go project of his: `/plugin marketplace add C:\source\aletheia`, then `/plugin install aletheia@aletheia`, then `/aletheia:setup`.
+- **Worked:** the install, and the setup skill. The agent checked the binary, ran `init --agents` and skipped `--claude-hooks` because the plugin brings the hooks. It found no older hook entries.
+- **Fix 1 · init still suggested `--claude-hooks`:** the agent had to tell the user to ignore that line. Now `init` reads `enabledPlugins` from Claude Code's settings, local then project then user. With the plugin on, it says the hooks are already there, and it warns when `--claude-hooks` would add them a second time.
+- **Fix 2 · the dry run came back empty without saying why:** the project has 6 source files, under the 25 that a code map starts at, and no memories yet. That result is correct, but the agent called it "worth checking". Now an empty dry run lists the reasons. `init` also no longer promises a code map in a project too small for one.
+- **Not Aletheia's:** the Serena MCP server failed to connect in that session.
