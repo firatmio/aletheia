@@ -7,7 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+
+	"github.com/firatmio/aletheia/internal/store"
 )
 
 // TestMain keeps the tests away from the developer's own Claude Code
@@ -658,5 +661,75 @@ func TestStopHookStartsANewTaskOnAnImageOnlyPrompt(t *testing.T) {
 	}
 	if strings.Contains(out, "ui/hints.go") {
 		t.Fatalf("an image-only prompt starts a new task; its files must not join the previous one: %q", out)
+	}
+}
+
+func TestHookRunsOnceWhenInstalledTwice(t *testing.T) {
+	// The plugin and .claude/settings.json both run `aletheia hook` for the
+	// same event; the agent must get the context once and a task one map.
+	t.Setenv("ALETHEIA_DIR", "")
+	dir := t.TempDir()
+	writeFile(t, dir, "lib.go", "package x\n\nfunc Clamp(x, lo, hi int) int { return x }\n")
+	runCLI(t, dir, "", "init")
+	runCLI(t, dir, "", "remember", "Clamp limits a value", "--anchor", "symbol:lib.go::Clamp")
+	transcript := filepath.Join(t.TempDir(), "session.jsonl")
+	writeFile(t, filepath.Dir(transcript), "session.jsonl", "")
+	hook := func(event, prompt string) string {
+		t.Helper()
+		in, _ := json.Marshal(map[string]string{"hook_event_name": event, "prompt": prompt, "session_id": "s-twice", "cwd": dir, "transcript_path": transcript})
+		var out bytes.Buffer
+		run([]string{"hook"}, bytes.NewReader(in), &out, &bytes.Buffer{})
+		return out.String()
+	}
+
+	// Claude Code starts both hooks at once: run them side by side.
+	together := func(event, prompt string) []string {
+		t.Helper()
+		outs := make([]string, 4)
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		for i := range outs {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				outs[i] = hook(event, prompt)
+			}()
+		}
+		close(start)
+		wg.Wait()
+		return outs
+	}
+	sent := 0
+	for _, out := range together("UserPromptSubmit", "make clamp faster") {
+		if strings.Contains(out, "Clamp limits a value") {
+			sent++
+		}
+	}
+	if sent != 1 {
+		t.Fatalf("simultaneous calls must add the context once, not %d times", sent)
+	}
+
+	turn, _ := json.Marshal(map[string]any{"type": "user", "message": map[string]any{"content": "make clamp faster"}})
+	edit, _ := json.Marshal(map[string]any{"type": "assistant", "message": map[string]any{"content": []any{
+		map[string]any{"type": "tool_use", "name": "Edit", "input": map[string]any{"file_path": filepath.Join(dir, "lib.go")}},
+	}}})
+	writeFile(t, filepath.Dir(transcript), "session.jsonl", string(turn)+"\n"+string(edit)+"\n")
+	together("Stop", "")
+	if _, out, _ := runCLI(t, dir, "", "recall", "--limit", "20"); strings.Count(out, "Map: a task like") != 1 {
+		t.Fatalf("one task, one map: %q", out)
+	}
+
+	// The same prompt typed again in a later turn is a new call.
+	st, err := store.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !firstCall(st, "s-again", "UserPromptSubmit", "continue", transcript) || firstCall(st, "s-again", "UserPromptSubmit", "continue", transcript) {
+		t.Fatal("the first call goes ahead, its twin does not")
+	}
+	writeFile(t, filepath.Dir(transcript), "session.jsonl", string(turn)+"\n"+string(edit)+"\n"+string(turn)+"\n")
+	if !firstCall(st, "s-again", "UserPromptSubmit", "continue", transcript) {
+		t.Fatal("a later turn has a longer transcript, so the same prompt counts again")
 	}
 }

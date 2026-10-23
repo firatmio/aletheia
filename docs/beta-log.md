@@ -235,3 +235,9 @@ The agent moved the old Aletheia files aside, fetched the guide with curl and fo
 **B17 · fixed · a map labelled with the wrong prompt.** The turn that fixed B16 started from a message with only a screenshot. The Stop hook saw no text in it, took it for a machine-written message such as a tool result, and so did not start a new task. The files changed in that turn were captured under the previous prompt ("Push docs/name-decision…").
 - **The fix:** a prompt with an image now starts a new task. With no words there is nothing to name the task by, so its files are not captured. An image with text is labelled by the text.
 - **Test:** `TestStopHookStartsANewTaskOnAnImageOnlyPrompt`, which fails on the old code.
+
+**B18 · fixed · hooks installed twice ran twice.** In this repository the plugin was enabled for the user, and `.claude/settings.local.json` still had the same two hooks. Claude Code ran both at once.
+- **The effect:** the memory context reached the agent twice per prompt, and one task was captured as two identical maps (`29abbc` and `47eea7`).
+- **The cause:** both calls read the session state before either wrote it, so the existing once-per-session checks did not help.
+- **The fix:** `aletheia hook` names each call by session, event, prompt and transcript size, and creates a marker file exclusively. Of two simultaneous calls exactly one goes ahead. A prompt typed again in a later turn counts as new, because the transcript has grown.
+- **Test:** `TestHookRunsOnceWhenInstalledTwice` starts four calls at once. Without the guard it failed 10 of 10 runs, with the context sent 4 times.
