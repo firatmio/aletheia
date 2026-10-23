@@ -6,7 +6,9 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -626,6 +628,9 @@ func (c *cli) hook(args []string) int {
 	if err != nil {
 		return exitOK
 	}
+	if !firstCall(e.Store, in.SessionID, in.Event, in.Prompt, in.TranscriptPath) {
+		return exitOK // the same hook is configured twice; the other call does the work
+	}
 	if in.Event == "Stop" {
 		captureStop(e, in.SessionID, in.TranscriptPath)
 		return exitOK // Stop output would reach the agent; it gets none
@@ -711,6 +716,50 @@ func firstInSession(st *store.Store, session, what string) bool {
 	}
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err == nil {
 		_ = os.WriteFile(p, nil, 0o644)
+	}
+	return true
+}
+
+// firstCall reports whether this hook call is the first for one event of a
+// session. When the hooks are installed twice (the Claude Code plugin and
+// .claude/settings.json), Claude Code runs both for the same event, at the
+// same moment: the context would reach the agent twice and a task's map
+// would be captured twice. The call is named by the event, the prompt and
+// the transcript's size, which grows between turns, so a prompt typed again
+// later counts as new. The marker is created exclusively, so of two calls at
+// once exactly one goes ahead. Without a usable session id it always does.
+func firstCall(st *store.Store, session, event, prompt, transcript string) bool {
+	if session == "" || strings.ContainsAny(session, `/\:.`) || len(session) > 64 {
+		return true
+	}
+	size := int64(-1)
+	if info, err := os.Stat(transcript); transcript != "" && err == nil {
+		size = info.Size()
+	}
+	if event == "" {
+		event = "UserPromptSubmit"
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%d\x00%s", event, size, prompt)))
+	prefix := session + ".call-" + event + "-"
+	p := st.StateDir("sessions", prefix+hex.EncodeToString(sum[:8]))
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		return true
+	}
+	fh, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if errors.Is(err, os.ErrExist) {
+		return false
+	}
+	if err != nil {
+		return true // a state problem must not cost the agent its context
+	}
+	fh.Close()
+	// Only the latest call per event is needed; drop the older markers.
+	if old, err := filepath.Glob(filepath.Join(filepath.Dir(p), prefix+"*")); err == nil {
+		for _, o := range old {
+			if o != p {
+				_ = os.Remove(o)
+			}
+		}
 	}
 	return true
 }

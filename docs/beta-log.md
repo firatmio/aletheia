@@ -231,3 +231,9 @@ The agent moved the old Aletheia files aside, fetched the guide with curl and fo
 - **Fix 1 · init still suggested `--claude-hooks`:** the agent had to tell the user to ignore that line. Now `init` reads `enabledPlugins` from Claude Code's settings, local then project then user. With the plugin on, it says the hooks are already there, and it warns when `--claude-hooks` would add them a second time.
 - **Fix 2 · the dry run came back empty without saying why:** the project has 6 source files, under the 25 that a code map starts at, and no memories yet. That result is correct, but the agent called it "worth checking". Now an empty dry run lists the reasons. `init` also no longer promises a code map in a project too small for one.
 - **Not Aletheia's:** the Serena MCP server failed to connect in that session.
+
+**B18 · fixed · hooks installed twice ran twice.** In this repository the plugin was enabled for the user, and `.claude/settings.local.json` still had the same two hooks. Claude Code ran both at once.
+- **The effect:** the memory context reached the agent twice per prompt, and one task was captured as two identical maps (`29abbc` and `47eea7`).
+- **The cause:** both calls read the session state before either wrote it, so the existing once-per-session checks did not help.
+- **The fix:** `aletheia hook` names each call by session, event, prompt and transcript size, and creates a marker file exclusively. Of two simultaneous calls exactly one goes ahead. A prompt typed again in a later turn counts as new, because the transcript has grown.
+- **Test:** `TestHookRunsOnceWhenInstalledTwice` starts four calls at once. Without the guard it failed 10 of 10 runs, with the context sent 4 times.
