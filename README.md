@@ -26,7 +26,9 @@
   <a href="#reference">Reference</a>
 </p>
 
-<!-- Demo GIF of a real Claude Code session goes here (recorded with VHS). -->
+<p align="center">
+  <img src="assets/demo.gif" alt="A memory is saved with evidence and recalled as [ok] with its line. The file is moved and recall shows it as [moved] at its new place. The value is changed and recall hides the memory; verify says why: MaxDiscount changed." width="100%">
+</p>
 
 ## The problem
 
