@@ -689,6 +689,25 @@ func TestContainsAnchorMovesWithItsDeclaration(t *testing.T) {
 	}
 }
 
+func TestVerdictListsEachPointerAndReasonOnce(t *testing.T) {
+	v := newEnv(t)
+	v.write(t, "pricing.go", "package p\n\nconst MaxDiscount = 0.30\n")
+	m := v.remember(t, RememberInput{Claim: "Discounts are capped at 30%", Anchors: []string{`contains:pricing.go::MaxDiscount = 0\.30`}})
+	if got := v.e.Judge(m); strings.Join(got.Pointers, ",") != "pricing.go:3" {
+		t.Fatalf("the contains anchor and its symbol share one line, so one pointer: %+v", got)
+	}
+
+	// Moved and changed: the symbol is found by name, but not the same code.
+	if err := os.Remove(filepath.Join(v.root, "pricing.go")); err != nil {
+		t.Fatal(err)
+	}
+	v.write(t, "discount.go", "package p\n\nconst MaxDiscount = 0.50\n")
+	got := v.e.Judge(m)
+	if got.Freshness != Stale || strings.Join(got.Reasons, "; ") != "pricing.go: missing; MaxDiscount changed (now in discount.go)" {
+		t.Fatalf("each reason once, and say where the changed code is: %+v", got)
+	}
+}
+
 func TestContainsDoesNotJumpIntoAnotherDeclaration(t *testing.T) {
 	v := newEnv(t)
 	v.write(t, "x.go", "package p\n\nfunc F() { _ = \"marker\" }\n\nfunc G() int { return 7 }\n")
