@@ -3,9 +3,10 @@
 // read it too.
 
 export const site = {
-  // false while the repository is private: hides the GitHub link, marks the
-  // install command as not available yet and says so in /agents.md.
-  released: false,
+  // false while the repository was private (until v0.1.0): it hid the GitHub
+  // link, marked the install command as not available yet and said so in
+  // /agents.md.
+  released: true,
   url: "https://aletheia.firattunaarslan.me",
   repo: "https://github.com/firatmio/aletheia",
   method: "https://github.com/firatmio/aletheia/blob/main/docs/dogfood-4.2.md",
