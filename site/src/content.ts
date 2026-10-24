@@ -26,7 +26,6 @@ export const site = {
 };
 
 export const hero = {
-  eyebrow: "Memory for coding agents",
   title: ["Memory your agent", "can ", "verify."],
   lede:
     "Every memory carries evidence from your code. Aletheia re-checks it on every recall, " +
