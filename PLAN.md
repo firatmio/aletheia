@@ -308,6 +308,32 @@ Aletheia has no claim yet. The goal is to **save tokens without losing quality**
 - R6 (`docs/dogfood-4.2.md` §11, main 9e1c7df, paired, 1 rep per repo): **Hugo −22% cost** (−38% input tokens, −31% turns, 6/7 tasks cheaper); **expr −9% again** (R5+R6: $7.14 vs $7.85, reading before the first edit −48%). 28/28 acceptance. All Hugo tasks are one kind; a second Hugo replicate or a task mix comes before any launch claim. Next idea: `[moved]` for symbol anchors whose declaration moved unchanged.
 - R7 (`docs/dogfood-4.2.md` §12, beta.5, paired, 1 rep, Hugo with four task kinds: template funcs, `common/` helpers, behaviour changes): **−7% cost** (−14% input tokens, −11% turns), 14/14 acceptance. Saving came from template funcs and one behaviour change; `common/` helpers broke even. Hugo R6+R7: $4.31 vs $5.05, −15%. Trap: the T1 memory stayed stale (not `[moved]`) because its claim names `math.go`, as designed. Idea to discuss: steer agents to keep paths in anchors, not claims.
 - Benchmark harness: run the same coding tasks with (a) no memory, (b) naive append-only memory, (c) Aletheia; measure input tokens per task and task success. Include a "stale trap" scenario (a fact changes mid-run). Publish method and numbers in the README; no numbers before this exists.
+  - **The three arms and the stale trap are required (2026-10-24).** Arm (b) is what separates "having memory" from "having verified memory"; without it the numbers cannot show Aletheia's own contribution.
+  - **Publish:** the per-task table, the number of replicates and confidence intervals, not only totals.
+  - **Measure memory's contribution separately** from everything else that changes between arms (hooks, the code map, the snippet), and do not fold it into one headline number.
+  - **Method and limitations** stay in the README, in plain words.
+
+**Ideas from the Yoystro review (2026-10-24)**
+
+yoystro.com is a closed-source, early-access product selling "persistent memory plus model routing". Its benchmark (SWE-bench Verified, 50 tasks) was taken before any memory accumulated, so it does not measure what memory adds. It describes no mechanism for catching stale or contradicting memories, which is Aletheia's niche. Not a competitor, but three of its ideas are missing here and fit the invariants (no LLM, no network, no dependencies, never executes anything):
+
+- **A. Cold start: `aletheia init --scan`** (between v0.2 and v0.3):
+  - **Drafts:** derive first memory drafts, with anchors, from go.mod, package.json, pyproject.toml, the README and the top-level layout.
+  - **Deterministic:** no LLM.
+  - **Review:** drafts are never written directly; the user or agent approves them. `--dry-run` is the default.
+- **B. Semi-automatic capture:**
+  - **Suggest, don't decide:** at the end of a session, offer the agent "do you want to remember these?" with anchor candidates for the files it changed. The agent decides what to write; Aletheia only proposes candidates and anchors. No LLM call.
+  - **Builds on what exists:** the Stop hook already captures a map of the task's files (4.5), so this extends that hook rather than adding a new one.
+  - **Without running git:** a `git diff` would break invariant 2. Take the changed files from the session transcript, as the map capture does, or by reading files, never by executing a command.
+  - **Where it lives:** the Claude Code integration goes with the plugin's hooks in `plugin/`.
+- **C. Recipe (procedural) memory:**
+  - **Shape:** instead of one claim, "this kind of change is done like this" as steps, each with its own anchors. If any step goes stale, the whole recipe is stale.
+  - **Changes the memory format:** ask Fırat before implementing (CLAUDE.md). Design note only for now. Preferred direction: backward-compatible, e.g. a `type: recipe` frontmatter field that older binaries ignore.
+
+**Deliberately out of scope**
+- Agent orchestration: model routing, budget caps, verifying outputs or tests.
+- A "run the tests" anchor; anchors never execute anything (invariant 2).
+- Accounts or a cloud service; memory stays local and is shared through git.
 
 **v0.4: reach**
 - Prebuilt binaries via releases, Homebrew tap, Scoop bucket (Fırat uses Windows + scoop), `npx @firatmio/aletheia` wrapper (npm name `aletheia` is taken; `aletheia-mem` was free on 2026-10-21).
@@ -332,3 +358,6 @@ Aletheia has no claim yet. The goal is to **save tokens without losing quality**
 3. Landing page: GitHub Pages vs. Cloudflare Pages vs. `aletheia.firattunaarslan.me`.
 4. Is a tree-sitter dependency acceptable for `symbol:` anchors, or regex-only?
 5. Launch plan (HN / Reddit r/LocalLLaMA / X / Turkish dev communities) and timing: after the benchmark exists.
+6. `init --scan`: which files should it read?
+7. Recipe memory: is a frontmatter extension (`type: recipe`) acceptable?
+8. End-of-session capture: which agents first (Claude Code, Cursor, Cline)?
