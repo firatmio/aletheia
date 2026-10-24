@@ -283,6 +283,13 @@ footer { margin-top: 96px; border-top: 1px solid var(--line); }
   .hide-sm, .navlinks .pill { display: none; }
   .figs { grid-template-columns: minmax(0, 1fr); }
   .install code { font-size: 12px; }
+  /* Phones: nobody installs from one, so the hero keeps the title, the lede
+     and one button; the commands are in Quick start, linked from the nav.
+     The story, without its side panels here, needs less scrolling. */
+  h1 { font-size: 11vw; } /* "Memory your agent" stays on one line */
+  .hero-actions .installer, .gloss, .cue { display: none; }
+  .hero-actions { align-items: center; }
+  .story { height: 260vh; }
 }
 
 /* Without motion the story is a plain transcript, all scenes visible. */
