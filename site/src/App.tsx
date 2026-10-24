@@ -184,7 +184,7 @@ export default function App() {
                 </span>
               }
             >
-              <a class="pill" href={site.repo}>
+              <a class="pill" href={site.repo} target="_blank">
                 <GitHubMark /> GitHub
               </a>
             </Show>
@@ -196,7 +196,6 @@ export default function App() {
       <main id="top">
         <HeroArt />
         <section class="hero wrap">
-          <span class="eyebrow">{hero.eyebrow}</span>
           <h1>
             {hero.title[0]}
             <br />
@@ -250,7 +249,7 @@ export default function App() {
               </ol>
               <p>{proof.caveat}</p>
               <Show when={site.released} fallback={<p class="dim">{proof.methodSoon}</p>}>
-                <a href={site.method}>{proof.methodLink} →</a>
+                <a href={site.method} target="_blank">{proof.methodLink} →</a>
               </Show>
             </aside>
           </div>
@@ -278,7 +277,7 @@ export default function App() {
               <nav class="foot-col" aria-label={col.title}>
                 <h2>{col.title}</h2>
                 <ul>
-                  <For each={col.links}>{(l) => <li><a href={l.href}>{l.label}</a></li>}</For>
+                  <For each={col.links}>{(l) => <li><a href={l.href} target={l.href.startsWith("http") ? "_blank" : undefined}>{l.label}</a></li>}</For>
                 </ul>
               </nav>
             )}
@@ -291,7 +290,7 @@ export default function App() {
           <span class="foot-social">
             <For each={footer.author.links}>
               {(l) => (
-                <a href={l.href} rel="me" aria-label={l.label} title={l.label}>
+                <a href={l.href} rel="me" aria-label={l.label} title={l.label} target="_blank">
                   <Dynamic component={socialIcons[l.icon as keyof typeof socialIcons]} size={18} aria-hidden="true" />
                 </a>
               )}
@@ -300,7 +299,7 @@ export default function App() {
         </div>
         <p class="wrap credit">
           {footer.credit.before}
-          <a href={footer.credit.href}>
+          <a href={footer.credit.href} target="_blank">
             <i>{footer.credit.title}</i>
           </a>
           {footer.credit.after}
