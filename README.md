@@ -23,6 +23,7 @@
 
 <p align="center">
   <a href="https://glama.ai/mcp/servers/firatmio/aletheia"><img alt="Aletheia MCP server on Glama" src="https://glama.ai/mcp/servers/firatmio/aletheia/badges/score.svg"></a>
+  <a href="https://m8ven.ai/mcp/firatmio-aletheia-1kwqod?s=readme"><img alt="M8ven Score" src="https://m8ven.ai/badge/mcp/firatmio-aletheia-1kwqod?v=73ae6c7f2e17a22905a9bb29c678d195&amp;variant=verified"></a>
 </p>
 
 <p align="center">
